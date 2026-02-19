@@ -204,4 +204,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-[MIT](LICENSE) - Copyright (c) 2025 Axontic
+[MIT](LICENSE) - Copyright (c) 2026 Axontic
