@@ -2,7 +2,7 @@
 
 A real-time dashboard showing which Windows VMs are currently in use via RDP sessions.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)
 
 ## Features
@@ -204,4 +204,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-[MIT](LICENSE) - Copyright (c) 2026 Axontic
+[Apache-2.0](LICENSE) - Copyright 2025 Axontic

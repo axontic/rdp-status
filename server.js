@@ -3,6 +3,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const dns = require("dns").promises;
 
 const app = express();
@@ -10,15 +11,34 @@ app.use(cors());
 app.use(express.json({ limit: "256kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
+// Configuration
 const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 60_000;
 const OFFLINE_MS = Number(process.env.OFFLINE_MS) || 150_000;
-const CONSOLE_COUNTS_AS_BUSY = (process.env.CONSOLE_BUSY || "false").toLowerCase() === "true";
-const USE_CLIENT_OCCUPANCY = (process.env.USE_CLIENT_OCCUPANCY || "true").toLowerCase() === "true";
+const CONSOLE_COUNTS_AS_BUSY =
+  (process.env.CONSOLE_BUSY || "false").toLowerCase() === "true";
+const USE_CLIENT_OCCUPANCY =
+  (process.env.USE_CLIENT_OCCUPANCY || "true").toLowerCase() === "true";
+
+// Load emoji mapping from external config (if available)
+let emojiMap = { emojis: {}, default: "💻" };
+const emojiConfigPath = path.join(__dirname, "emoji-map.json");
+if (fs.existsSync(emojiConfigPath)) {
+  try {
+    emojiMap = JSON.parse(fs.readFileSync(emojiConfigPath, "utf8"));
+    console.log(`Loaded emoji mapping from ${emojiConfigPath}`);
+  } catch (err) {
+    console.warn(`Failed to load emoji-map.json: ${err.message}`);
+  }
+}
 
 const state = Object.create(null);
 
-const toLower = v => (v ?? "").toString().toLowerCase().trim();
+const toLower = (v) => (v ?? "").toString().toLowerCase().trim();
 
+/**
+ * Normalize session data to a consistent format.
+ * Handles both English and German state names.
+ */
 function normalizeSession(session) {
   const typeStr = toLower(session?.type || session?.session || "");
   const stateStrRaw = toLower(session?.state || "");
@@ -26,21 +46,32 @@ function normalizeSession(session) {
   if (typeStr.includes("console")) type = "console";
   else if (typeStr.includes("rdp")) type = "rdp";
 
+  // Normalize state names (support English and German)
   let stateStr = stateStrRaw;
-  if (stateStrRaw.startsWith("act") || stateStrRaw.startsWith("aktiv")) stateStr = "active";
-  else if (stateStrRaw.startsWith("conn") || stateStrRaw.startsWith("verb")) stateStr = "connected";
-  else if (stateStrRaw.startsWith("disc") || stateStrRaw.startsWith("getrennt")) stateStr = "disconnected";
+  if (stateStrRaw.startsWith("act") || stateStrRaw.startsWith("aktiv"))
+    stateStr = "active";
+  else if (stateStrRaw.startsWith("conn") || stateStrRaw.startsWith("verb"))
+    stateStr = "connected";
+  else if (stateStrRaw.startsWith("disc") || stateStrRaw.startsWith("getrennt"))
+    stateStr = "disconnected";
 
   const sessionId = Number.isInteger(session?.sessionId)
     ? session.sessionId
-    : (Number.isFinite(+session?.sessionId) ? +session.sessionId : null);
+    : Number.isFinite(+session?.sessionId)
+      ? +session.sessionId
+      : null;
 
   return { user: session?.user ?? "", sessionId, type, state: stateStr };
 }
 
+/**
+ * Derive session counts and overall status from session list.
+ */
 function deriveCountsAndStatus(sessions = []) {
   const norm = Array.isArray(sessions) ? sessions.map(normalizeSession) : [];
-  let rdp_active = 0, rdp_disc = 0, console_active = 0;
+  let rdp_active = 0,
+    rdp_disc = 0,
+    console_active = 0;
   for (const s of norm) {
     if (s.type === "rdp" && s.state === "active") rdp_active++;
     if (s.type === "rdp" && s.state === "disconnected") rdp_disc++;
@@ -58,12 +89,15 @@ function deriveCountsAndStatus(sessions = []) {
     counts: {
       rdp_active_count: rdp_active,
       rdp_disconnected_count: rdp_disc,
-      console_active_count: console_active
+      console_active_count: console_active,
     },
-    status
+    status,
   };
 }
 
+/**
+ * Extract status from client-provided occupancy data.
+ */
 function statusFromClientOccupancy(occ) {
   if (!USE_CLIENT_OCCUPANCY || !occ?.status) return null;
   const s = toLower(occ.status);
@@ -73,33 +107,46 @@ function statusFromClientOccupancy(occ) {
   return null;
 }
 
+/**
+ * Choose an emoji for a VM based on its hostname.
+ * Uses external emoji-map.json if available, otherwise returns default.
+ */
 function chooseEmoji(host) {
   const h = toLower(host);
-  if (h.includes("banane") || h.includes("banana")) return "🍌";
-  if (h.includes("local-vm-bier")) return "🍺";
-  if (h.includes("kirsche") || h.includes("cherry")) return "🍒";
-  if (h.includes("traube") || h.includes("grape")) return "🍇";
-  if (h.includes("zitrone") || h.includes("lemon")) return "🍋";
-  if (h.includes("melone") || h.includes("watermelon")) return "🍉";
-  if (h.includes("kiwi")) return "🥝";
-  if (h.includes("ananas") || h.includes("pineapple")) return "🍍";
-  if (h.includes("erdbeere") || h.includes("strawberry")) return "🍓";
-  if (h.includes("pfirsich") || h.includes("peach")) return "🍑";
-  if (h.includes("kaktus") || h.includes("cactus")) return "🌵";
-  if (h.includes("karotte") || h.includes("carrot")) return "🥕";
-  if (h.includes("apfel") || h.includes("apple")) return "🍎";
-  if (h.includes("birne") || h.includes("pear")) return "🍐";
-  if (h.includes("dev")) return "👨‍💻";
-  return "💻";
+
+  // Check each key in the emoji map
+  for (const [key, emoji] of Object.entries(emojiMap.emojis || {})) {
+    if (h.includes(key.toLowerCase())) {
+      return emoji;
+    }
+  }
+
+  return emojiMap.default || "💻";
 }
 
 app.post("/api/status", async (req, res) => {
-  const { vm, ip, rdns, fqdn, sessions, occupancy, event, user, sessionId, ts } = req.body || {};
+  const {
+    vm,
+    ip,
+    rdns,
+    fqdn,
+    sessions,
+    occupancy,
+    event,
+    user,
+    sessionId,
+    ts,
+  } = req.body || {};
   if (!vm) return res.status(400).json({ error: "Missing field: vm" });
 
-  const { normSessions, counts, status: statusFromSess } = deriveCountsAndStatus(sessions);
+  const {
+    normSessions,
+    counts,
+    status: statusFromSess,
+  } = deriveCountsAndStatus(sessions);
   const occStatus = statusFromClientOccupancy(occupancy);
-  const status = (statusFromSess === "BUSY") ? "BUSY" : (occStatus ?? statusFromSess);
+  const status =
+    statusFromSess === "BUSY" ? "BUSY" : (occStatus ?? statusFromSess);
 
   let resolvedRdns = rdns || null;
   let hostname = rdns || fqdn || vm;
@@ -111,7 +158,9 @@ app.post("/api/status", async (req, res) => {
         resolvedRdns = names[0];
         if (!fqdn) hostname = resolvedRdns;
       }
-    } catch { /* ignore DNS errors */ }
+    } catch {
+      /* ignore DNS errors */
+    }
   }
 
   const emoji = chooseEmoji(hostname);
@@ -131,14 +180,18 @@ app.post("/api/status", async (req, res) => {
       event: event || "-",
       user: user || "",
       sessionId: Number.isInteger(sessionId) ? sessionId : null,
-      ts: ts || Date.now()
+      ts: ts || Date.now(),
     },
-    ...counts
+    ...counts,
   };
 
   const t = new Date().toLocaleTimeString();
-  const sessLog = normSessions.map(s => `${s.type}#${s.sessionId ?? "-"} ${s.user || "-"} [${s.state}]`).join(" | ");
-  console.log(`[${t}] ${vm} (${hostname}${ip ? " - " + ip : ""}) -> ${state[vm].lastEvent.event} | status=${status} | rdpAct=${counts.rdp_active_count} rdpDisc=${counts.rdp_disconnected_count} consAct=${counts.console_active_count}`);
+  const sessLog = normSessions
+    .map((s) => `${s.type}#${s.sessionId ?? "-"} ${s.user || "-"} [${s.state}]`)
+    .join(" | ");
+  console.log(
+    `[${t}] ${vm} (${hostname}${ip ? " - " + ip : ""}) -> ${state[vm].lastEvent.event} | status=${status} | rdpAct=${counts.rdp_active_count} rdpDisc=${counts.rdp_disconnected_count} consAct=${counts.console_active_count}`,
+  );
   if (normSessions.length) console.log(`   sessions: ${sessLog}`);
 
   res.sendStatus(200);
@@ -148,10 +201,10 @@ app.get("/api/status", (_req, res) => {
   const now = Date.now();
   const result = {};
   for (const [vm, info] of Object.entries(state)) {
-    const offline = (now - info.lastSeen) > OFFLINE_MS;
+    const offline = now - info.lastSeen > OFFLINE_MS;
     result[vm] = {
       ...info,
-      effectiveStatus: offline ? "OFFLINE" : info.status
+      effectiveStatus: offline ? "OFFLINE" : info.status,
     };
   }
   res.json(result);
@@ -163,5 +216,7 @@ app.get("/", (_req, res) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () =>
-  console.log(`RDP Status Server running on :${port} (HB=${HEARTBEAT_MS}ms, OFF=${OFFLINE_MS}ms, CONSOLE_BUSY=${CONSOLE_COUNTS_AS_BUSY}, USE_CLIENT_OCCUPANCY=${USE_CLIENT_OCCUPANCY})`)
+  console.log(
+    `RDP Status Server running on :${port} (HB=${HEARTBEAT_MS}ms, OFF=${OFFLINE_MS}ms, CONSOLE_BUSY=${CONSOLE_COUNTS_AS_BUSY}, USE_CLIENT_OCCUPANCY=${USE_CLIENT_OCCUPANCY})`,
+  ),
 );

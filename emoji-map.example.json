@@ -1,0 +1,19 @@
+{
+  "emojis": {
+    "banana": "🍌",
+    "cherry": "🍒",
+    "grape": "🍇",
+    "lemon": "🍋",
+    "watermelon": "🍉",
+    "kiwi": "🥝",
+    "pineapple": "🍍",
+    "strawberry": "🍓",
+    "peach": "🍑",
+    "cactus": "🌵",
+    "carrot": "🥕",
+    "apple": "🍎",
+    "pear": "🍐",
+    "dev": "👨‍💻"
+  },
+  "default": "💻"
+}

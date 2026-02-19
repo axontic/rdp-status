@@ -1,444 +1,792 @@
-
 <!doctype html>
-<html lang="de" data-theme="dark">
-<head>
-  <meta charset="utf-8" />
-  <title>RDP Presence Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    /* =========================
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>RDP Presence Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* =========================
        THEME VARIABLES
        - Dark: Rosé Pine (Classic)
        - Light: Rosé Pine Dawn
-       - Status: Ampel (busy=rot, idle=orange, free=grün, offline=blaugrau)
-       - UI Tweaks: konsistenter Radius, größere Icons
+       - Status: Traffic light (busy=red, idle=amber, free=green, offline=blue-gray)
+       - UI Tweaks: consistent radius, larger icons
        ========================= */
 
-    /* ---- DARK THEME: Rosé Pine (Classic) ---- */
-    :root{
-      /* Flächen / Layout */
-      --bg:        #191724; /* base */
-      --panel:     #1F1D2E; /* surface */
-      --row:       #26233A; /* overlay */
-      --row-alt:   #2E2A45; /* overlay/high */
-      --off-bg:    #1E1B2B; /* dunkler für Offline-Flächen */
-      --border:    #524F67; /* highlightHigh */
-      --chip-bg:   #26233A; /* dezente Chips */
+      /* ---- DARK THEME: Rosé Pine (Classic) ---- */
+      :root {
+        /* Surfaces / Layout */
+        --bg: #191724; /* base */
+        --panel: #1f1d2e; /* surface */
+        --row: #26233a; /* overlay */
+        --row-alt: #2e2a45; /* overlay/high */
+        --off-bg: #1e1b2b; /* darker for offline surfaces */
+        --border: #524f67; /* highlightHigh */
+        --chip-bg: #26233a; /* subtle chips */
 
-      /* Typo */
-      --text:      #E0DEF4; /* text */
-      --muted:     #908CAA; /* subtle */
+        /* Typography */
+        --text: #e0def4; /* text */
+        --muted: #908caa; /* subtle */
 
-      /* Statusfarben – Ampel */
-      --busy: #D64545; /* Rot */
-      --idle: #E39A2F; /* Orange/Amber */
-      --ok:   #4C837A; /* Grün */
-      --off:  #6B7C88; /* gedämpftes Blau-Grau */
+        /* Status colors - traffic light */
+        --busy: #d64545; /* red */
+        --idle: #e39a2f; /* amber */
+        --ok: #4c837a; /* green */
+        --off: #6b7c88; /* muted blue-gray */
 
-      /* Schatten (leicht violett-grau) */
-      --shadow: rgba(82, 79, 103, 0.35);
+        /* Shadow (slightly violet-gray) */
+        --shadow: rgba(82, 79, 103, 0.35);
 
-      /* Konsistenz & Icons */
-      --radius: 12px;
-      --icon-size: clamp(36px, 4.5vw, 48px);       /* Tabelle */
-      --icon-size-card: clamp(40px, 5vw, 56px);    /* Karten */
-    }
+        /* Consistency & Icons */
+        --radius: 12px;
+        --icon-size: clamp(36px, 4.5vw, 48px); /* table */
+        --icon-size-card: clamp(40px, 5vw, 56px); /* cards */
+      }
 
-    /* ---- LIGHT THEME: Rosé Pine Dawn ---- */
-    html[data-theme="light"]{
-      /* Flächen / Layout */
-      --bg:        #FAF4ED; /* base */
-      --panel:     #FFFAF3; /* surface */
-      --row:       #FFFFFF; /* helle Karten-/Tabellenfläche */
-      --row-alt:   #F2E9E1; /* overlay */
-      --off-bg:    #F4EDE8; /* highlightLow / offline */
-      --border:    #CECACD; /* highlightHigh */
-      --chip-bg:   #F7F1EB;
+      /* ---- LIGHT THEME: Rosé Pine Dawn ---- */
+      html[data-theme="light"] {
+        /* Surfaces / Layout */
+        --bg: #faf4ed; /* base */
+        --panel: #fffaf3; /* surface */
+        --row: #ffffff; /* light card/table surface */
+        --row-alt: #f2e9e1; /* overlay */
+        --off-bg: #f4ede8; /* highlightLow / offline */
+        --border: #cecacd; /* highlightHigh */
+        --chip-bg: #f7f1eb;
 
-      /* Typo */
-      --text:      #575279; /* text */
-      --muted:     #797593; /* subtle */
+        /* Typography */
+        --text: #575279; /* text */
+        --muted: #797593; /* subtle */
 
-      /* Statusfarben – Ampel (leicht abgedunkelt für Kontrast) */
-      --busy: #C73B3B;
-      --idle: #CC8A2A;
-      --ok:   #4C837A;
-      --off:  #8FA1AD;
+        /* Status colors - traffic light (slightly darkened for contrast) */
+        --busy: #c73b3b;
+        --idle: #cc8a2a;
+        --ok: #4c837a;
+        --off: #8fa1ad;
 
-      /* Schatten dezenter */
-      --shadow: rgba(87, 82, 121, 0.12);
+        /* Shadow more subtle */
+        --shadow: rgba(87, 82, 121, 0.12);
 
-      /* Radius & Icons bleiben identisch für Konsistenz */
-      --radius: 12px;
-      --icon-size: clamp(36px, 4.5vw, 48px);
-      --icon-size-card: clamp(40px, 5vw, 56px);
-    }
+        /* Radius & Icons stay identical for consistency */
+        --radius: 12px;
+        --icon-size: clamp(36px, 4.5vw, 48px);
+        --icon-size-card: clamp(40px, 5vw, 56px);
+      }
 
-    /* =========================
+      /* =========================
        BASE
        ========================= */
-    * { box-sizing: border-box; }
-    html, body {
-      margin:0; padding:0;
-      background:var(--bg); color:var(--text);
-      font:14px/1.45 system-ui, Segoe UI, Roboto, Arial, sans-serif;
-    }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          Segoe UI,
+          Roboto,
+          Arial,
+          sans-serif;
+      }
 
-    header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding:16px 20px;
-      border-bottom:1px solid var(--border);
-      position:sticky; top:0; z-index:10;
-      /* Dark: dezenter Verlauf, Light: solide Fläche (Lesbarkeit!) */
-      background: linear-gradient(180deg, rgba(31, 29, 46, .96), var(--panel));
-    }
-    html[data-theme="light"] header {
-      background: var(--panel); /* KEIN Verlauf im Light-Mode */
-      box-shadow: 0 1px 0 var(--border);
-    }
-    header h1 { margin:0; font-size:19px; font-weight:700; letter-spacing:0.2px; color: var(--text); }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        /* Dark: dezenter Verlauf, Light: solide Fläche (Lesbarkeit!) */
+        background: linear-gradient(
+          180deg,
+          rgba(31, 29, 46, 0.96),
+          var(--panel)
+        );
+      }
+      html[data-theme="light"] header {
+        background: var(--panel); /* KEIN Verlauf im Light-Mode */
+        box-shadow: 0 1px 0 var(--border);
+      }
+      header h1 {
+        margin: 0;
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: var(--text);
+      }
 
-    .controls { display:flex; gap:12px; align-items:center; color:var(--muted); }
-    .controls label { font-size:13px; }
-    .controls select, .controls button {
-      background:var(--chip-bg); color:var(--text); border:1px solid var(--border);
-      padding:6px 10px; border-radius:8px; font-size:13px; cursor:pointer;
-      box-shadow: 0 1px 2px var(--shadow);
-    }
+      .controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        color: var(--muted);
+      }
+      .controls label {
+        font-size: 13px;
+      }
+      .controls select,
+      .controls button {
+        background: var(--chip-bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        box-shadow: 0 1px 2px var(--shadow);
+      }
 
-    .btn { display:inline-flex; align-items:center; gap:6px; }
-    .btn-toggle { min-width: 40px; text-align:center; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-toggle {
+        min-width: 40px;
+        text-align: center;
+      }
 
-    main { padding:18px 20px; }
-    .legend { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; color:var(--muted); font-size:13px; }
-    .legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
-    .dot.busy { background:var(--busy); }
-    .dot.idle { background:var(--idle); }
-    .dot.free { background:var(--ok); }
-    .dot.off  { background:var(--off); }
-    .pill {
-      display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px;
-      background:var(--chip-bg); border:1px solid var(--border); color:var(--muted); font-size:12px;
-    }
+      main {
+        padding: 18px 20px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .legend .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .dot.busy {
+        background: var(--busy);
+      }
+      .dot.idle {
+        background: var(--idle);
+      }
+      .dot.free {
+        background: var(--ok);
+      }
+      .dot.off {
+        background: var(--off);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: var(--chip-bg);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+      }
 
-    .view-switch { display:flex; gap:8px; align-items:center; }
+      .view-switch {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
 
-    /* =========================
+      /* =========================
        TABLE LAYOUT
        ========================= */
-    table { width:100%; border-collapse:separate; border-spacing:0 6px; table-layout: fixed; }
-    thead th {
-      text-align:left; font-weight:600; font-size:12px; color:var(--muted);
-      padding:8px 10px;
-    }
-    tbody tr {
-      background:var(--row);
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      overflow:hidden;
-      box-shadow: 0 2px 10px var(--shadow);
-      transition: box-shadow .15s ease, border-color .15s ease, background .15s ease, opacity .15s ease, transform .15s ease;
-      position: relative;
-    }
-    tbody tr:nth-child(even) { background:var(--row-alt); }
-    tbody tr:hover { box-shadow: 0 6px 18px var(--shadow); transform: translateY(-1px); }
-    td { padding:12px 12px; vertical-align:middle; }
-    td:nth-child(1) { width: 50%; }
-    td:nth-child(2) { width: 120px; }
-    td:nth-child(3) { width: 25%; }
-    td:nth-child(4) { width: 25%; }
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 6px;
+        table-layout: fixed;
+      }
+      thead th {
+        text-align: left;
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--muted);
+        padding: 8px 10px;
+      }
+      tbody tr {
+        background: var(--row);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: 0 2px 10px var(--shadow);
+        transition:
+          box-shadow 0.15s ease,
+          border-color 0.15s ease,
+          background 0.15s ease,
+          opacity 0.15s ease,
+          transform 0.15s ease;
+        position: relative;
+      }
+      tbody tr:nth-child(even) {
+        background: var(--row-alt);
+      }
+      tbody tr:hover {
+        box-shadow: 0 6px 18px var(--shadow);
+        transform: translateY(-1px);
+      }
+      td {
+        padding: 12px 12px;
+        vertical-align: middle;
+      }
+      td:nth-child(1) {
+        width: 50%;
+      }
+      td:nth-child(2) {
+        width: 120px;
+      }
+      td:nth-child(3) {
+        width: 25%;
+      }
+      td:nth-child(4) {
+        width: 25%;
+      }
 
-    .vm { display:flex; align-items:center; gap:14px; min-width:0; }
-    .emoji {
-      font-size: var(--icon-size);
-      line-height: 1;
-      flex: 0 0 auto;
-      transform: translateY(1px); /* optische Baseline */
-    }
-    .host { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto; }
-    .host .name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
-    .host .meta { color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+      .vm {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+      }
+      .emoji {
+        font-size: var(--icon-size);
+        line-height: 1;
+        flex: 0 0 auto;
+        transform: translateY(1px); /* optische Baseline */
+      }
+      .host {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .host .name {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .host .meta {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
 
-    .status-chip {
-      display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
-      font-weight:600; font-size:12px; background:var(--chip-bg); border:1px solid var(--border);
-      white-space: nowrap;
-    }
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 12px;
+        background: var(--chip-bg);
+        border: 1px solid var(--border);
+        white-space: nowrap;
+      }
 
-    /* Tönung je Status */
-    .status-busy  { color:#fff; border-color:var(--busy); background:linear-gradient(180deg, color-mix(in oklab, var(--busy) 18%, transparent), transparent); }
-    .status-idle  { color:#fff; border-color:var(--idle); background:linear-gradient(180deg, color-mix(in oklab, var(--idle) 18%, transparent), transparent); }
-    .status-free  { color:#fff; border-color:var(--ok);   background:linear-gradient(180deg, color-mix(in oklab, var(--ok)   16%, transparent), transparent); }
-    .status-off   { color:#d6deed; border-color:var(--off); background:linear-gradient(180deg, color-mix(in oklab, var(--off) 15%, transparent), transparent); }
+      /* Tönung je Status */
+      .status-busy {
+        color: #fff;
+        border-color: var(--busy);
+        background: linear-gradient(
+          180deg,
+          color-mix(in oklab, var(--busy) 18%, transparent),
+          transparent
+        );
+      }
+      .status-idle {
+        color: #fff;
+        border-color: var(--idle);
+        background: linear-gradient(
+          180deg,
+          color-mix(in oklab, var(--idle) 18%, transparent),
+          transparent
+        );
+      }
+      .status-free {
+        color: #fff;
+        border-color: var(--ok);
+        background: linear-gradient(
+          180deg,
+          color-mix(in oklab, var(--ok) 16%, transparent),
+          transparent
+        );
+      }
+      .status-off {
+        color: #d6deed;
+        border-color: var(--off);
+        background: linear-gradient(
+          180deg,
+          color-mix(in oklab, var(--off) 15%, transparent),
+          transparent
+        );
+      }
 
-    html[data-theme="light"] .status-busy,
-    html[data-theme="light"] .status-idle,
-    html[data-theme="light"] .status-free { color: var(--text); }
+      html[data-theme="light"] .status-busy,
+      html[data-theme="light"] .status-idle,
+      html[data-theme="light"] .status-free {
+        color: var(--text);
+      }
 
-    .counts { color:var(--muted); font-size:12px; display:flex; gap:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-    .fade { color:var(--muted); }
-    .small { font-size:12px; }
-    .right { text-align:right; }
+      .counts {
+        color: var(--muted);
+        font-size: 12px;
+        display: flex;
+        gap: 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mono {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+          monospace;
+      }
+      .fade {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .right {
+        text-align: right;
+      }
 
-    .error { color:#fca5a5; margin-top:8px; }
-    .footer { margin-top:18px; color:var(--muted); font-size:12px; }
+      .error {
+        color: #fca5a5;
+        margin-top: 8px;
+      }
+      .footer {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
 
-    /* Sichtbare Status-Ränder (inset) – alle Status */
-    .row-free    { border-color: var(--ok) !important;    box-shadow: inset 0 0 0 1.5px var(--ok),    0 2px 10px var(--shadow); }
-    .row-idle    { border-color: var(--idle) !important;  box-shadow: inset 0 0 0 1.5px var(--idle),  0 2px 10px var(--shadow); }
-    .row-busy    { border-color: var(--busy) !important;  box-shadow: inset 0 0 0 1.5px var(--busy),  0 2px 10px var(--shadow); }
-    .row-offline { border-color: var(--off) !important;   box-shadow: inset 0 0 0 1.5px var(--off),   0 2px 10px var(--shadow); background: var(--off-bg) !important; opacity: .55; }
+      /* Sichtbare Status-Ränder (inset) – alle Status */
+      .row-free {
+        border-color: var(--ok) !important;
+        box-shadow:
+          inset 0 0 0 1.5px var(--ok),
+          0 2px 10px var(--shadow);
+      }
+      .row-idle {
+        border-color: var(--idle) !important;
+        box-shadow:
+          inset 0 0 0 1.5px var(--idle),
+          0 2px 10px var(--shadow);
+      }
+      .row-busy {
+        border-color: var(--busy) !important;
+        box-shadow:
+          inset 0 0 0 1.5px var(--busy),
+          0 2px 10px var(--shadow);
+      }
+      .row-offline {
+        border-color: var(--off) !important;
+        box-shadow:
+          inset 0 0 0 1.5px var(--off),
+          0 2px 10px var(--shadow);
+        background: var(--off-bg) !important;
+        opacity: 0.55;
+      }
 
-    /* Glow nur, wenn Body die Klasse glow-on hat */
-    .glow-busy { /* keine Animation per Default */ }
-    .glow-on .glow-busy {
-      animation: busyGlow 1.6s ease-in-out infinite;
-    }
-    @keyframes busyGlow {
-      0%   { box-shadow: inset 0 0 0 1.5px var(--busy), 0 2px 10px var(--shadow), 0 0 0 rgba(214,69,69,0); }
-      50%  { box-shadow: inset 0 0 0 1.5px var(--busy), 0 2px 10px var(--shadow), 0 0 18px rgba(214,69,69,.45); }
-      100% { box-shadow: inset 0 0 0 1.5px var(--busy), 0 2px 10px var(--shadow), 0 0 0 rgba(214,69,69,0); }
-    }
+      /* Glow nur, wenn Body die Klasse glow-on hat */
+      .glow-busy {
+        /* keine Animation per Default */
+      }
+      .glow-on .glow-busy {
+        animation: busyGlow 1.6s ease-in-out infinite;
+      }
+      @keyframes busyGlow {
+        0% {
+          box-shadow:
+            inset 0 0 0 1.5px var(--busy),
+            0 2px 10px var(--shadow),
+            0 0 0 rgba(214, 69, 69, 0);
+        }
+        50% {
+          box-shadow:
+            inset 0 0 0 1.5px var(--busy),
+            0 2px 10px var(--shadow),
+            0 0 18px rgba(214, 69, 69, 0.45);
+        }
+        100% {
+          box-shadow:
+            inset 0 0 0 1.5px var(--busy),
+            0 2px 10px var(--shadow),
+            0 0 0 rgba(214, 69, 69, 0);
+        }
+      }
 
-    /* =========================
+      /* =========================
        CARD LAYOUT
        ========================= */
-    .grid {
-      display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap:12px;
-    }
-    .card {
-      background: var(--row);
-      border:1px solid var(--border);
-      border-radius: var(--radius);   /* konsistent */
-      padding:12px 12px;
-      box-shadow: 0 2px 10px var(--shadow);
-      transition: box-shadow .15s ease, border-color .15s ease, background .15s ease, opacity .15s ease, transform .15s ease;
-      overflow: hidden;               /* Kanten sauber */
-    }
-    .card:hover { box-shadow: 0 6px 18px var(--shadow); transform: translateY(-1px); }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--row);
+        border: 1px solid var(--border);
+        border-radius: var(--radius); /* konsistent */
+        padding: 12px 12px;
+        box-shadow: 0 2px 10px var(--shadow);
+        transition:
+          box-shadow 0.15s ease,
+          border-color 0.15s ease,
+          background 0.15s ease,
+          opacity 0.15s ease,
+          transform 0.15s ease;
+        overflow: hidden; /* Kanten sauber */
+      }
+      .card:hover {
+        box-shadow: 0 6px 18px var(--shadow);
+        transform: translateY(-1px);
+      }
 
-    .card-free    { border-color: var(--ok) !important; }
-    .card-idle    { border-color: var(--idle) !important; }
-    .card-busy    { border-color: var(--busy) !important; }
-    .card-offline { border-color: var(--off) !important; background: var(--off-bg) !important; opacity: .55; }
+      .card-free {
+        border-color: var(--ok) !important;
+      }
+      .card-idle {
+        border-color: var(--idle) !important;
+      }
+      .card-busy {
+        border-color: var(--busy) !important;
+      }
+      .card-offline {
+        border-color: var(--off) !important;
+        background: var(--off-bg) !important;
+        opacity: 0.55;
+      }
 
-    .card-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
-    .card-title  { display:flex; align-items:center; gap:12px; min-width:0; flex:1 1 auto; }
-    .status-wrap { flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; margin-left:12px; }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .card-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .status-wrap {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        margin-left: 12px;
+      }
 
-    .card .emoji {
-      font-size: var(--icon-size-card);
-      line-height: 1;
-      flex: 0 0 auto;
-      transform: translateY(1px);
-    }
-    .card .name  { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
-    .card .meta  { color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
-    .card .counts{ margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .card .footer{ display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:12px; color:var(--muted); }
+      .card .emoji {
+        font-size: var(--icon-size-card);
+        line-height: 1;
+        flex: 0 0 auto;
+        transform: translateY(1px);
+      }
+      .card .name {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .card .meta {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .card .counts {
+        margin-top: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .card .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
 
-    /* Sichtbarkeit je Modus */
-    #tableWrap, #cardsWrap { display:none; }
-    .mode-table #tableWrap { display:block; }
-    .mode-cards #cardsWrap { display:block; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>RDP Presence Dashboard</h1>
-    <div class="controls">
-      <div class="view-switch">
-        <button id="viewBtn" class="btn btn-toggle" title="Ansicht umschalten (Tabelle/Karten)">🗂 Karten</button>
-        <button id="themeBtn" class="btn btn-toggle" title="Light/Dark umschalten">🌙 Dark</button>
-        <button id="glowBtn" class="btn btn-toggle" title="Glow an/aus">✨ Glow AN</button>
+      /* Sichtbarkeit je Modus */
+      #tableWrap,
+      #cardsWrap {
+        display: none;
+      }
+      .mode-table #tableWrap {
+        display: block;
+      }
+      .mode-cards #cardsWrap {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RDP Presence Dashboard</h1>
+      <div class="controls">
+        <div class="view-switch">
+          <button
+            id="viewBtn"
+            class="btn btn-toggle"
+            title="Switch view (Table/Cards)"
+          >
+            🗂 Cards
+          </button>
+          <button
+            id="themeBtn"
+            class="btn btn-toggle"
+            title="Toggle Light/Dark"
+          >
+            🌙 Dark
+          </button>
+          <button id="glowBtn" class="btn btn-toggle" title="Glow on/off">
+            ✨ Glow ON
+          </button>
+        </div>
+        <label for="refreshSel">Refresh:</label>
+        <select id="refreshSel" title="Polling interval">
+          <option value="3000">3s</option>
+          <option value="5000" selected>5s</option>
+          <option value="10000">10s</option>
+          <option value="30000">30s</option>
+          <option value="60000">60s</option>
+        </select>
+        <button id="refreshBtn" class="btn" title="Reload now">Reload</button>
       </div>
-      <label for="refreshSel">Aktualisierung:</label>
-      <select id="refreshSel" title="Polling-Intervall">
-        <option value="3000">3s</option>
-        <option value="5000" selected>5s</option>
-        <option value="10000">10s</option>
-        <option value="30000">30s</option>
-        <option value="60000">60s</option>
-      </select>
-      <button id="refreshBtn" class="btn" title="Jetzt neu laden">Neu laden</button>
-    </div>
-  </header>
+    </header>
 
-  <main>
-    <div class="legend">
-      <span><span class="dot busy"></span>BUSY</span>
-      <span><span class="dot idle"></span>IDLE</span>
-      <span><span class="dot free"></span>FREE</span>
-      <span><span class="dot off"></span>OFFLINE</span>
-    </div>
+    <main>
+      <div class="legend">
+        <span><span class="dot busy"></span>BUSY</span>
+        <span><span class="dot idle"></span>IDLE</span>
+        <span><span class="dot free"></span>FREE</span>
+        <span><span class="dot off"></span>OFFLINE</span>
+      </div>
 
-    <!-- TABLE -->
-    <div id="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>VM</th>
-            <th>Status</th>
-            <th>Sessions/Counts</th>
-            <th class="right">Zuletzt</th>
-          </tr>
-        </thead>
-        <tbody id="vmBody"></tbody>
-      </table>
-    </div>
+      <!-- TABLE -->
+      <div id="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>VM</th>
+              <th>Status</th>
+              <th>Sessions/Counts</th>
+              <th class="right">Last Seen</th>
+            </tr>
+          </thead>
+          <tbody id="vmBody"></tbody>
+        </table>
+      </div>
 
-    <!-- CARDS -->
-    <div id="cardsWrap">
-      <div id="grid" class="grid"></div>
-    </div>
+      <!-- CARDS -->
+      <div id="cardsWrap">
+        <div id="grid" class="grid"></div>
+      </div>
 
-    <div id="errBox" class="error" style="display:none;"></div>
-    <div class="footer small">
-      Quelle: <span class="mono">/api/status</span> — wird periodisch gepollt.
-      <span id="lastUpdate" class="fade"></span>
-    </div>
-  </main>
+      <div id="errBox" class="error" style="display: none"></div>
+      <div class="footer small">
+        Source: <span class="mono">/api/status</span> — polled periodically.
+        <span id="lastUpdate" class="fade"></span>
+      </div>
+    </main>
 
-  <script>
-    // --- Local settings (persisted) ---
-    const PREF_THEME_KEY = "rdp_theme";
-    const PREF_VIEW_KEY  = "rdp_view";
-    const PREF_GLOW_KEY  = "rdp_glow";
-    // Defaults: dark theme, table view, glow OFF
-    const DEFAULT_THEME  = (localStorage.getItem(PREF_THEME_KEY) || "dark").toLowerCase();
-    const DEFAULT_VIEW   = (localStorage.getItem(PREF_VIEW_KEY)  || "table").toLowerCase();
-    const DEFAULT_GLOW   = (localStorage.getItem(PREF_GLOW_KEY)  || "off").toLowerCase(); // "on"|"off"
+    <script>
+      // --- Local settings (persisted) ---
+      const PREF_THEME_KEY = "rdp_theme";
+      const PREF_VIEW_KEY = "rdp_view";
+      const PREF_GLOW_KEY = "rdp_glow";
+      // Defaults: dark theme, table view, glow OFF
+      const DEFAULT_THEME = (
+        localStorage.getItem(PREF_THEME_KEY) || "dark"
+      ).toLowerCase();
+      const DEFAULT_VIEW = (
+        localStorage.getItem(PREF_VIEW_KEY) || "table"
+      ).toLowerCase();
+      const DEFAULT_GLOW = (
+        localStorage.getItem(PREF_GLOW_KEY) || "off"
+      ).toLowerCase(); // "on"|"off"
 
-    // Elements
-    const vmBody = document.getElementById("vmBody");
-    const gridEl = document.getElementById("grid");
-    const errBox = document.getElementById("errBox");
-    const lastUpdateEl = document.getElementById("lastUpdate");
-    const refreshSel = document.getElementById("refreshSel");
-    const refreshBtn = document.getElementById("refreshBtn");
-    const viewBtn   = document.getElementById("viewBtn");
-    const themeBtn  = document.getElementById("themeBtn");
-    const glowBtn   = document.getElementById("glowBtn");
+      // Elements
+      const vmBody = document.getElementById("vmBody");
+      const gridEl = document.getElementById("grid");
+      const errBox = document.getElementById("errBox");
+      const lastUpdateEl = document.getElementById("lastUpdate");
+      const refreshSel = document.getElementById("refreshSel");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const viewBtn = document.getElementById("viewBtn");
+      const themeBtn = document.getElementById("themeBtn");
+      const glowBtn = document.getElementById("glowBtn");
 
-    // State
-    let timer = null;
-    let viewMode = (DEFAULT_VIEW === "cards" ? "cards" : "table");
-    let theme    = (DEFAULT_THEME === "light" ? "light" : "dark");
-    let glowOn   = (DEFAULT_GLOW === "on");
+      // State
+      let timer = null;
+      let viewMode = DEFAULT_VIEW === "cards" ? "cards" : "table";
+      let theme = DEFAULT_THEME === "light" ? "light" : "dark";
+      let glowOn = DEFAULT_GLOW === "on";
 
-    // Init theme + mode + glow
-    function applyTheme() {
-      document.documentElement.setAttribute("data-theme", theme);
-      themeBtn.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
-    }
-    function applyViewMode() {
-      document.body.classList.remove("mode-table", "mode-cards");
-      document.body.classList.add(viewMode === "cards" ? "mode-cards" : "mode-table");
-      viewBtn.textContent = viewMode === "cards" ? "📋 Tabelle" : "🗂 Karten";
-    }
-    function applyGlow() {
-      document.body.classList.toggle("glow-on", glowOn);
-      glowBtn.textContent = glowOn ? "✨ Glow AUS" : "✨ Glow AN";
-      localStorage.setItem(PREF_GLOW_KEY, glowOn ? "on" : "off");
-    }
+      // Init theme + mode + glow
+      function applyTheme() {
+        document.documentElement.setAttribute("data-theme", theme);
+        themeBtn.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
+      }
+      function applyViewMode() {
+        document.body.classList.remove("mode-table", "mode-cards");
+        document.body.classList.add(
+          viewMode === "cards" ? "mode-cards" : "mode-table",
+        );
+        viewBtn.textContent = viewMode === "cards" ? "📋 Table" : "🗂 Cards";
+      }
+      function applyGlow() {
+        document.body.classList.toggle("glow-on", glowOn);
+        glowBtn.textContent = glowOn ? "✨ Glow OFF" : "✨ Glow ON";
+        localStorage.setItem(PREF_GLOW_KEY, glowOn ? "on" : "off");
+      }
 
-    applyTheme();
-    applyViewMode();
-    applyGlow();
+      applyTheme();
+      applyViewMode();
+      applyGlow();
 
-    // Helpers
-    function escapeAttr(s) {
-      return String(s ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
+      // Helpers
+      function escapeAttr(s) {
+        return String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
 
-    function ipHostLine(info) {
-      const name = (info.hostname || info.fqdn || info.rdns || info.vm || "").trim();
-      const ip   = (info.ip   || "").trim();
-      const rdns = (info.rdns || "").trim();
-      const fqdn = (info.fqdn || "").trim();
+      function ipHostLine(info) {
+        const name = (
+          info.hostname ||
+          info.fqdn ||
+          info.rdns ||
+          info.vm ||
+          ""
+        ).trim();
+        const ip = (info.ip || "").trim();
+        const rdns = (info.rdns || "").trim();
+        const fqdn = (info.fqdn || "").trim();
 
-      const parts = [];
-      if (ip) parts.push(`IP: ${ip}`);
-      if (rdns && rdns !== name) parts.push(`rDNS: ${rdns}`);
-      if (fqdn && fqdn !== name) parts.push(`FQDN: ${fqdn}`);
+        const parts = [];
+        if (ip) parts.push(`IP: ${ip}`);
+        if (rdns && rdns !== name) parts.push(`rDNS: ${rdns}`);
+        if (fqdn && fqdn !== name) parts.push(`FQDN: ${fqdn}`);
 
-      return { name, meta: parts.join(" • ") };
-    }
+        return { name, meta: parts.join(" • ") };
+      }
 
-    function fmtRel(ts) {
-      if (!ts && ts !== 0) return "-";
-      const t = typeof ts === "number" ? ts : (new Date(ts)).getTime();
-      if (!Number.isFinite(t)) return "-";
-      const d = Date.now() - t;
-      if (d < 2000) return "gerade eben";
-      const s = Math.floor(d / 1000);
-      if (s < 60) return `${s}s`;
-      const m = Math.floor(s / 60);
-      if (m < 60) return `${m}m ${s % 60}s`;
-      const h = Math.floor(m / 60);
-      return `${h}h ${m % 60}m`;
-    }
+      function fmtRel(ts) {
+        if (!ts && ts !== 0) return "-";
+        const t = typeof ts === "number" ? ts : new Date(ts).getTime();
+        if (!Number.isFinite(t)) return "-";
+        const d = Date.now() - t;
+        if (d < 2000) return "just now";
+        const s = Math.floor(d / 1000);
+        if (s < 60) return `${s}s`;
+        const m = Math.floor(s / 60);
+        if (m < 60) return `${m}m ${s % 60}s`;
+        const h = Math.floor(m / 60);
+        return `${h}h ${m % 60}m`;
+      }
 
-    function statusChip(status) {
-      const s = (status || "").toUpperCase();
-      const cls = s === "BUSY" ? "status-busy" : s === "IDLE" ? "status-idle" : s === "FREE" ? "status-free" : "status-off";
-      return `<span class="status-chip ${cls}">${s}</span>`;
-    }
+      function statusChip(status) {
+        const s = (status || "").toUpperCase();
+        const cls =
+          s === "BUSY"
+            ? "status-busy"
+            : s === "IDLE"
+              ? "status-idle"
+              : s === "FREE"
+                ? "status-free"
+                : "status-off";
+        return `<span class="status-chip ${cls}">${s}</span>`;
+      }
 
-    function ipHostLineTitle(info) {
-      // Optional getrennte Titelzeile, falls du mehr Kontrolle willst
-      const { name, meta } = ipHostLine(info);
-      return `${name}${meta ? " • " + meta : ""}`;
-    }
-
-    function sortEntries(data) {
-      const order = { "BUSY": 0, "IDLE": 1, "FREE": 2, "OFFLINE": 3 };
-      return Object.values(data || {}).sort((a, b) => {
-        const ea = (a.effectiveStatus || a.status || "OFFLINE").toUpperCase();
-        const eb = (b.effectiveStatus || b.status || "OFFLINE").toUpperCase();
-        const da = order[ea] ?? 99;
-        const db = order[eb] ?? 99;
-        if (da !== db) return da - db;
-        const ha = (a.hostname || a.vm || "").toLowerCase();
-        const hb = (b.hostname || b.vm || "").toLowerCase();
-        return ha.localeCompare(hb);
-      });
-    }
-
-    // --- TABLE RENDER ---
-    function renderTable(data) {
-      const entries = sortEntries(data);
-      const rows = [];
-      for (const info of entries) {
-        const eff = (info.effectiveStatus || info.status || "OFFLINE").toUpperCase();
-        const statusKey = eff.toLowerCase();
-        const rowClass =
-          statusKey === "busy"    ? "row-busy glow-busy" :
-          statusKey === "idle"    ? "row-idle" :
-          statusKey === "free"    ? "row-free" :
-                                    "row-offline";
-
-        const emoji = info.emoji || chooseEmojiFallback(info.hostname || info.fqdn || info.vm);
+      function ipHostLineTitle(info) {
+        // Optional separate title line for more control
         const { name, meta } = ipHostLine(info);
-        const title = `${name}${meta ? " • " + meta : ""}`;
+        return `${name}${meta ? " • " + meta : ""}`;
+      }
 
-        const counts = [
-          `RDP: <strong>${info.rdp_active_count ?? 0}</strong>`,
-          `Disc: ${info.rdp_disconnected_count ?? 0}`,
-          `Cons: ${info.console_active_count ?? 0}`
-        ].join(" | ");
+      function sortEntries(data) {
+        const order = { BUSY: 0, IDLE: 1, FREE: 2, OFFLINE: 3 };
+        return Object.values(data || {}).sort((a, b) => {
+          const ea = (a.effectiveStatus || a.status || "OFFLINE").toUpperCase();
+          const eb = (b.effectiveStatus || b.status || "OFFLINE").toUpperCase();
+          const da = order[ea] ?? 99;
+          const db = order[eb] ?? 99;
+          if (da !== db) return da - db;
+          const ha = (a.hostname || a.vm || "").toLowerCase();
+          const hb = (b.hostname || b.vm || "").toLowerCase();
+          return ha.localeCompare(hb);
+        });
+      }
 
-        const lastEvt = info.lastEvent || {};
-        const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
+      // --- TABLE RENDER ---
+      function renderTable(data) {
+        const entries = sortEntries(data);
+        const rows = [];
+        for (const info of entries) {
+          const eff = (
+            info.effectiveStatus ||
+            info.status ||
+            "OFFLINE"
+          ).toUpperCase();
+          const statusKey = eff.toLowerCase();
+          const rowClass =
+            statusKey === "busy"
+              ? "row-busy glow-busy"
+              : statusKey === "idle"
+                ? "row-idle"
+                : statusKey === "free"
+                  ? "row-free"
+                  : "row-offline";
 
-        rows.push(`
+          const emoji =
+            info.emoji ||
+            chooseEmojiFallback(info.hostname || info.fqdn || info.vm);
+          const { name, meta } = ipHostLine(info);
+          const title = `${name}${meta ? " • " + meta : ""}`;
+
+          const counts = [
+            `RDP: <strong>${info.rdp_active_count ?? 0}</strong>`,
+            `Disc: ${info.rdp_disconnected_count ?? 0}`,
+            `Cons: ${info.console_active_count ?? 0}`,
+          ].join(" | ");
+
+          const lastEvt = info.lastEvent || {};
+          const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
+
+          rows.push(`
 <tr class="${rowClass}">
   <td>
     <div class="vm">
@@ -453,40 +801,51 @@
   <td><div class="counts" title="RDP: ${info.rdp_active_count ?? 0} | Disc: ${info.rdp_disconnected_count ?? 0} | Cons: ${info.console_active_count ?? 0}">${counts}</div></td>
   <td class="right small">
     <div>${lastEvtTxt}</div>
-    <div class="fade">gesehen vor ${fmtRel(info.lastSeen)}</div>
+    <div class="fade">seen ${fmtRel(info.lastSeen)} ago</div>
   </td>
 </tr>`);
+        }
+        vmBody.innerHTML =
+          rows.join("") ||
+          `<tr><td colspan="4" class="fade">No entries</td></tr>`;
       }
-      vmBody.innerHTML = rows.join("") || `<tr><td colspan="4" class="fade">Keine Einträge</td></tr>`;
-    }
 
-    // --- CARDS RENDER ---
-    function renderCards(data) {
-      const entries = sortEntries(data);
-      const cards = [];
-      for (const info of entries) {
-        const eff = (info.effectiveStatus || info.status || "OFFLINE").toUpperCase();
-        const statusKey = eff.toLowerCase();
-        const cardClass =
-          statusKey === "busy"    ? "card card-busy glow-busy" :
-          statusKey === "idle"    ? "card card-idle" :
-          statusKey === "free"    ? "card card-free" :
-                                    "card card-offline";
+      // --- CARDS RENDER ---
+      function renderCards(data) {
+        const entries = sortEntries(data);
+        const cards = [];
+        for (const info of entries) {
+          const eff = (
+            info.effectiveStatus ||
+            info.status ||
+            "OFFLINE"
+          ).toUpperCase();
+          const statusKey = eff.toLowerCase();
+          const cardClass =
+            statusKey === "busy"
+              ? "card card-busy glow-busy"
+              : statusKey === "idle"
+                ? "card card-idle"
+                : statusKey === "free"
+                  ? "card card-free"
+                  : "card card-offline";
 
-        const emoji = info.emoji || chooseEmojiFallback(info.hostname || info.fqdn || info.vm);
-        const { name, meta } = ipHostLine(info);
-        const title = `${name}${meta ? " • " + meta : ""}`;
+          const emoji =
+            info.emoji ||
+            chooseEmojiFallback(info.hostname || info.fqdn || info.vm);
+          const { name, meta } = ipHostLine(info);
+          const title = `${name}${meta ? " • " + meta : ""}`;
 
-        const counts = [
-          `RDP: <strong>${info.rdp_active_count ?? 0}</strong>`,
-          `Disc: ${info.rdp_disconnected_count ?? 0}`,
-          `Cons: ${info.console_active_count ?? 0}`
-        ].join(" | ");
+          const counts = [
+            `RDP: <strong>${info.rdp_active_count ?? 0}</strong>`,
+            `Disc: ${info.rdp_disconnected_count ?? 0}`,
+            `Cons: ${info.console_active_count ?? 0}`,
+          ].join(" | ");
 
-        const lastEvt = info.lastEvent || {};
-        const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
+          const lastEvt = info.lastEvent || {};
+          const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
 
-        cards.push(`
+          cards.push(`
 <div class="${cardClass}">
   <div class="card-header">
     <div class="card-title" title="${escapeAttr(title)}">
@@ -501,87 +860,80 @@
   <div class="counts" title="RDP: ${info.rdp_active_count ?? 0} | Disc: ${info.rdp_disconnected_count ?? 0} | Cons: ${info.console_active_count ?? 0}">${counts}</div>
   <div class="footer">
     <div class="fade mono">${lastEvtTxt}</div>
-    <div class="fade">vor ${fmtRel(info.lastSeen)}</div>
+    <div class="fade">${fmtRel(info.lastSeen)} ago</div>
   </div>
 </div>`);
+        }
+        gridEl.innerHTML =
+          cards.join("") || `<div class="fade">No entries</div>`;
       }
-      gridEl.innerHTML = cards.join("") || `<div class="fade">Keine Einträge</div>`;
-    }
 
-    // --- Load + Poll ---
-    async function load() {
-      try {
-        const res = await fetch("/api/status", { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+      // --- Load + Poll ---
+      async function load() {
+        try {
+          const res = await fetch("/api/status", { cache: "no-store" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
 
-        if (document.body.classList.contains("mode-cards")) renderCards(json);
-        else renderTable(json);
+          if (document.body.classList.contains("mode-cards")) renderCards(json);
+          else renderTable(json);
 
-        errBox.style.display = "none";
-        lastUpdateEl.textContent = `Letzte Aktualisierung: ${new Date().toLocaleTimeString()}`;
-      } catch (err) {
-        errBox.textContent = `Fehler beim Laden: ${err.message || err}`;
-        errBox.style.display = "block";
+          errBox.style.display = "none";
+          lastUpdateEl.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+          errBox.textContent = `Error loading: ${err.message || err}`;
+          errBox.style.display = "block";
+        }
       }
-    }
 
-    function startTimer() {
-      if (timer) clearInterval(timer);
-      const ms = Number(refreshSel.value) || 5000;
-      timer = setInterval(load, ms);
-    }
+      function startTimer() {
+        if (timer) clearInterval(timer);
+        const ms = Number(refreshSel.value) || 5000;
+        timer = setInterval(load, ms);
+      }
 
-    // --- Events ---
-    refreshSel.addEventListener("change", () => { startTimer(); });
-    refreshBtn.addEventListener("click", () => load());
-    viewBtn.addEventListener("click", () => {
-      const isCards = document.body.classList.contains("mode-cards");
-      document.body.classList.toggle("mode-cards", !isCards);
-      document.body.classList.toggle("mode-table", isCards);
-      localStorage.setItem(PREF_VIEW_KEY, document.body.classList.contains("mode-cards") ? "cards" : "table");
-      const current = localStorage.getItem(PREF_VIEW_KEY) || "table";
-      viewBtn.textContent = current === "cards" ? "📋 Tabelle" : "🗂 Karten";
+      // --- Events ---
+      refreshSel.addEventListener("change", () => {
+        startTimer();
+      });
+      refreshBtn.addEventListener("click", () => load());
+      viewBtn.addEventListener("click", () => {
+        const isCards = document.body.classList.contains("mode-cards");
+        document.body.classList.toggle("mode-cards", !isCards);
+        document.body.classList.toggle("mode-table", isCards);
+        localStorage.setItem(
+          PREF_VIEW_KEY,
+          document.body.classList.contains("mode-cards") ? "cards" : "table",
+        );
+        const current = localStorage.getItem(PREF_VIEW_KEY) || "table";
+        viewBtn.textContent = current === "cards" ? "📋 Table" : "🗂 Cards";
+        load();
+      });
+      themeBtn.addEventListener("click", () => {
+        theme = theme === "dark" ? "light" : "dark";
+        localStorage.setItem(PREF_THEME_KEY, theme);
+        applyTheme();
+      });
+      glowBtn.addEventListener("click", () => {
+        glowOn = !glowOn;
+        applyGlow();
+      });
+
+      function chooseEmojiFallback(host) {
+        // Fallback only used when server doesn't provide emoji
+        // Server handles emoji mapping via emoji-map.json
+        return "💻";
+      }
+
+      // Initial mode classes
+      document.body.classList.add(
+        DEFAULT_VIEW === "cards" ? "mode-cards" : "mode-table",
+      );
+      if (DEFAULT_GLOW === "on") document.body.classList.add("glow-on");
+
+      // Initial load
       load();
-    });
-    themeBtn.addEventListener("click", () => {
-      theme = (theme === "dark") ? "light" : "dark";
-      localStorage.setItem(PREF_THEME_KEY, theme);
-      applyTheme();
-    });
-    glowBtn.addEventListener("click", () => {
-      glowOn = !glowOn;
-      applyGlow();
-    });
-
-    function chooseEmojiFallback(host) {
-      const h = (host || "").toLowerCase();
-      if (h.includes("banane") || h.includes("banana")) return "🍌";
-      if (h.includes("local-vm-bier")) return "🍺";
-      if (h.includes("kirsche") || h.includes("cherry")) return "🍒";
-      if (h.includes("traube") || h.includes("grape")) return "🍇";
-      if (h.includes("zitrone") || h.includes("lemon")) return "🍋";
-      if (h.includes("melone") || h.includes("watermelon")) return "🍉";
-      if (h.includes("kiwi")) return "🥝";
-      if (h.includes("ananas") || h.includes("pineapple")) return "🍍";
-      if (h.includes("erdbeere") || h.includes("strawberry")) return "🍓";
-      if (h.includes("pfirsich") || h.includes("peach")) return "🍑";
-      if (h.includes("kaktus") || h.includes("cactus")) return "🌵";
-      if (h.includes("karotte") || h.includes("carrot")) return "🥕";
-      if (h.includes("apfel") || h.includes("apple")) return "🍎";
-      if (h.includes("birne") || h.includes("pear"))  return "🍐";
-      if (h.includes("dev"))   return "👨‍💻";
-      return "💻";
-    }
-
-    // Initial mode classes
-    document.body.classList.add(DEFAULT_VIEW === "cards" ? "mode-cards" : "mode-table");
-    if (DEFAULT_GLOW === "on") document.body.classList.add("glow-on");
-
-    // Initial load
-    load();
-    startTimer();
-  </script>
-</body>
+      startTimer();
+    </script>
+  </body>
 </html>
-
