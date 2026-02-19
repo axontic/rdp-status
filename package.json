@@ -1,0 +1,41 @@
+{
+  "name": "rdp-status",
+  "version": "1.0.0",
+  "description": "Real-time dashboard showing which Windows VMs are currently in use via RDP sessions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "rdp",
+    "remote-desktop",
+    "dashboard",
+    "monitoring",
+    "windows",
+    "vm",
+    "session"
+  ],
+  "author": "Axontic",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/axontic/rdp-status.git"
+  },
+  "homepage": "https://github.com/axontic/rdp-status#readme",
+  "bugs": {
+    "url": "https://github.com/axontic/rdp-status/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "fetch": "^1.1.0",
+    "fs-extra": "^11.3.3",
+    "node-fetch": "^3.3.2"
+  }
+}

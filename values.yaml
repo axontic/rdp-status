@@ -1,0 +1,18 @@
+replicaCount: 1
+
+image:
+  repository: myregistry/rdp-status
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+env:
+  PORT: 3000
+  HEARTBEAT_MS: 60000
+  OFFLINE_MS: 150000
+  CONSOLE_BUSY: "false"
+  USE_CLIENT_OCCUPANCY: "true"
+

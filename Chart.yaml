@@ -1,0 +1,5 @@
+apiVersion: v2
+name: rdp-status
+description: RDP Status Server
+version: 0.1.0
+appVersion: "1.0"

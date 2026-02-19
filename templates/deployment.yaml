@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rdp-status.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "rdp-status.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "rdp-status.name" . }}
+    spec:
+      containers:
+        - name: rdp-status
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.env.PORT }}"
+            - name: HEARTBEAT_MS
+              value: "{{ .Values.env.HEARTBEAT_MS }}"
+            - name: OFFLINE_MS
+              value: "{{ .Values.env.OFFLINE_MS }}"
+            - name: CONSOLE_BUSY
+              value: "{{ .Values.env.CONSOLE_BUSY }}"
+            - name: USE_CLIENT_OCCUPANCY
+              value: "{{ .Values.env.USE_CLIENT_OCCUPANCY }}"
+
