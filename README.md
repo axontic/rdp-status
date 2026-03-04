@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="RDP Status Dashboard" width="400">
+</p>
+
 # RDP Status Dashboard
 
 A real-time dashboard showing which Windows VMs are currently in use via RDP sessions.
