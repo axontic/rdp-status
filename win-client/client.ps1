@@ -5,8 +5,8 @@ $timeoutS   = 2
 $heartbeatS = 60
 $quiet      = $true
 
-$considerDisconnectedAsBusy = $false  # $true => "Getrennt" zählt als belegt
-$consoleCountsAsBusy        = $false  # << Konsole NICHT als belegt zählen
+$considerDisconnectedAsBusy = $false  # $true => "Disconnected" counts as busy
+$consoleCountsAsBusy        = $false  # << Console does NOT count as busy
 
 $script:considerDisconnectedAsBusy = $considerDisconnectedAsBusy
 $script:consoleCountsAsBusy        = $consoleCountsAsBusy
@@ -14,14 +14,14 @@ $script:consoleCountsAsBusy        = $consoleCountsAsBusy
 $ProgressPreference = 'SilentlyContinue'
 $script:warnedInvalidUrl = $false
 
-$wcTypeName = 'Mbb.Net.WebClientWithTimeout'
+$wcTypeName = 'Axontic.Net.WebClientWithTimeout'
 if (-not ($wcTypeName -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.Net;
 using System.Text;
 
-namespace Mbb.Net {
+namespace Axontic.Net {
     public class WebClientWithTimeout : WebClient {
         public int Timeout { get; set; }
         public WebClientWithTimeout() { this.Timeout = 2000; } // ms
@@ -61,14 +61,14 @@ function Test-ServerUrlValid {
     } catch { return $false }
 }
 
-$wtsTypeName = 'Mbb.Net.Wts'
+$wtsTypeName = 'Axontic.Net.Wts'
 if (-not ($wtsTypeName -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace Mbb.Net {
+namespace Axontic.Net {
     public class Wts {
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         private struct WTS_SESSION_INFO {
@@ -101,7 +101,7 @@ namespace Mbb.Net {
             public int SessionId;
             public string StationName;
             public string State;          // "Active" | "Connected" | "Disconnected" | "Unknown"
-            public string User;           // DOMAIN\user (falls vorhanden)
+            public string User;           // DOMAIN\user (if available)
             public string Domain;
             public int ProtocolType;      // 0 = Console, 2 = RDP (typisch)
         }
@@ -122,7 +122,7 @@ namespace Mbb.Net {
                     info.SessionId = si.SessionId;
                     info.StationName = si.pWinStationName ?? "";
 
-                    // State präzise mappen
+                    // Map state precisely
                     info.State = MapState(si.State);
 
                     string user = QueryString(si.SessionId, WTS_INFO_CLASS.WTSUserName);
@@ -187,7 +187,7 @@ function Get-SessionSnapshot {
     $sessions = @()
 
     try {
-        $wtsSessions = [Mbb.Net.Wts]::EnumSessions()
+        $wtsSessions = [Axontic.Net.Wts]::EnumSessions()
     } catch {
         $wtsSessions = @()
     }
@@ -267,7 +267,7 @@ function Send-Event {
 
     if (-not (Test-ServerUrlValid $serverUrl)) {
         if (-not $script:warnedInvalidUrl -and -not $quiet) {
-            Write-Warning "Ungültige Server-URL: $serverUrl (Ereignisse werden nicht gesendet, Skript läuft weiter)"
+            Write-Warning "Invalid server URL: $serverUrl (events will not be sent, script continues)"
         }
         $script:warnedInvalidUrl = $true
         return
@@ -301,13 +301,13 @@ function Send-Event {
         [void]$wc.UploadString($serverUrl, 'POST', $json)
 
         if (-not $quiet) {
-            Write-Output ("[{0}] Gesendet: {1} {2}" -f (Get-Date -Format "HH:mm:ss"), $Event, $userText)
+            Write-Output ("[{0}] Sent: {1} {2}" -f (Get-Date -Format "HH:mm:ss"), $Event, $userText)
         }
     } catch {
         if (-not $quiet) {
-            Write-Output ("[{0}] Sendefehler (offline?): {1}" -f (Get-Date -Format "HH:mm:ss"), $Event)
+            Write-Output ("[{0}] Send error (offline?): {1}" -f (Get-Date -Format "HH:mm:ss"), $Event)
         }
-        # nie beenden
+        # never terminate
     }
 }
 
@@ -351,14 +351,14 @@ try {
     Unregister-Event -SourceIdentifier 'SessionEvents' -ErrorAction SilentlyContinue | Out-Null
     $null = Register-WmiEvent -Class Win32_SessionChangeEvent -SourceIdentifier 'SessionEvents'
     $sessionEventRegistered = $true
-    if (-not $quiet) { Write-Output "SessionChange-Events abonniert." }
+    if (-not $quiet) { Write-Output "SessionChange events subscribed." }
 } catch {
-    if (-not $quiet) { Write-Warning "SessionChange-Events nicht verfügbar, nutze Polling-Fallback." }
+    if (-not $quiet) { Write-Warning "SessionChange events not available, using polling fallback." }
     $sessionEventRegistered = $false
 }
 
 $nextHeartbeat = (Get-Date).AddSeconds($heartbeatS)
-$reSubAt = (Get-Date).AddMinutes(30)   # optionales Auto-Re-Subscribe
+$reSubAt = (Get-Date).AddMinutes(30)   # optional auto re-subscribe
 
 if ($sessionEventRegistered) {
     while ($true) {
@@ -373,7 +373,7 @@ if ($sessionEventRegistered) {
                 $evtProcessed = $true
             }
 
-            # Optional: alle 30 Min neu abonnieren (robust gegen WMI-Hänger)
+            # Optional: re-subscribe every 30 min (robust against WMI hangs)
             if (Get-Date -ge $reSubAt) {
                 try {
                     Unregister-Event -SourceIdentifier 'SessionEvents' -ErrorAction SilentlyContinue | Out-Null
@@ -406,10 +406,10 @@ else {
             }
         } catch {
             if (-not $quiet) {
-                Write-Output ("[{0}] Polling-Fallback: Ausnahmesituation, weiter..." -f (Get-Date -Format "HH:mm:ss"))
+                Write-Output ("[{0}] Polling fallback: exception occurred, continuing..." -f (Get-Date -Format "HH:mm:ss"))
             }
         } finally {
-            # <<< Heartbeat IMMER >>>
+            # <<< Heartbeat ALWAYS >>>
             if (Get-Date -ge $nextHeartbeat) {
                 Send-Event -Event 'heartbeat' -User '' -SessionId -1
                 $nextHeartbeat = (Get-Date).AddSeconds($heartbeatS)
