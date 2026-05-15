@@ -1,13 +1,14 @@
 replicaCount: 1
 
 image:
-  repository: myregistry/rdp-status
-  tag: latest
+  repository: axontic.azurecr.io/rdp-status-dashboard
+  tag: 1.1.1
   pullPolicy: IfNotPresent
 
 service:
-  type: ClusterIP
-  port: 3000
+  type: LoadBalancer
+  port: 80
+  targetPort: 3000
 
 env:
   PORT: 3000
@@ -15,4 +16,3 @@ env:
   OFFLINE_MS: 150000
   CONSOLE_BUSY: "false"
   USE_CLIENT_OCCUPANCY: "true"
-

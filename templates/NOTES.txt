@@ -1,0 +1,13 @@
+RDP Status Dashboard wurde erfolgreich installiert!
+
+1. Service-IP abfragen:
+   kubectl get svc {{ include "rdp-status.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+
+2. Dashboard öffnen:
+   http://<SERVICE-IP>:{{ .Values.service.port }}
+
+3. PowerShell-Client auf Windows-VMs konfigurieren:
+   $serverUrl = "http://<SERVICE-IP>:{{ .Values.service.port }}/api/status"
+
+4. Client starten (als Administrator):
+   .\client.ps1

@@ -102,7 +102,7 @@
         position: sticky;
         top: 0;
         z-index: 10;
-        /* Dark: dezenter Verlauf, Light: solide Fläche (Lesbarkeit!) */
+        /* Dark: subtle gradient, Light: solid surface (readability!) */
         background: linear-gradient(
           180deg,
           rgba(31, 29, 46, 0.96),
@@ -110,7 +110,7 @@
         );
       }
       html[data-theme="light"] header {
-        background: var(--panel); /* KEIN Verlauf im Light-Mode */
+        background: var(--panel); /* NO gradient in Light Mode */
         box-shadow: 0 1px 0 var(--border);
       }
       header h1 {
@@ -265,7 +265,7 @@
         font-size: var(--icon-size);
         line-height: 1;
         flex: 0 0 auto;
-        transform: translateY(1px); /* optische Baseline */
+        transform: translateY(1px); /* optical baseline */
       }
       .host {
         display: flex;
@@ -303,7 +303,7 @@
         white-space: nowrap;
       }
 
-      /* Tönung je Status */
+      /* Tinted by status */
       .status-busy {
         color: #fff;
         border-color: var(--busy);
@@ -381,7 +381,7 @@
         font-size: 12px;
       }
 
-      /* Sichtbare Status-Ränder (inset) – alle Status */
+      /* Visible status borders (inset) – all statuses */
       .row-free {
         border-color: var(--ok) !important;
         box-shadow:
@@ -409,9 +409,9 @@
         opacity: 0.55;
       }
 
-      /* Glow nur, wenn Body die Klasse glow-on hat */
+      /* Glow only when body has the class glow-on */
       .glow-busy {
-        /* keine Animation per Default */
+        /* no animation by default */
       }
       .glow-on .glow-busy {
         animation: busyGlow 1.6s ease-in-out infinite;
@@ -448,7 +448,7 @@
       .card {
         background: var(--row);
         border: 1px solid var(--border);
-        border-radius: var(--radius); /* konsistent */
+        border-radius: var(--radius); /* consistent */
         padding: 12px 12px;
         box-shadow: 0 2px 10px var(--shadow);
         transition:
@@ -457,7 +457,7 @@
           background 0.15s ease,
           opacity 0.15s ease,
           transform 0.15s ease;
-        overflow: hidden; /* Kanten sauber */
+        overflow: hidden; /* clean edges */
       }
       .card:hover {
         box-shadow: 0 6px 18px var(--shadow);
@@ -537,7 +537,7 @@
         color: var(--muted);
       }
 
-      /* Sichtbarkeit je Modus */
+      /* Visibility per mode */
       #tableWrap,
       #cardsWrap {
         display: none;
@@ -732,7 +732,7 @@
       }
 
       function ipHostLineTitle(info) {
-        // Optional separate title line for more control
+        // Optional separate title line, if you want more control
         const { name, meta } = ipHostLine(info);
         return `${name}${meta ? " • " + meta : ""}`;
       }
@@ -771,9 +771,9 @@
                   ? "row-free"
                   : "row-offline";
 
-          const emoji =
-            info.emoji ||
-            chooseEmojiFallback(info.hostname || info.fqdn || info.vm);
+          const emoji = chooseEmojiFallback(
+            info.fqdn || info.hostname || info.vm,
+          );
           const { name, meta } = ipHostLine(info);
           const title = `${name}${meta ? " • " + meta : ""}`;
 
@@ -830,9 +830,9 @@
                   ? "card card-free"
                   : "card card-offline";
 
-          const emoji =
-            info.emoji ||
-            chooseEmojiFallback(info.hostname || info.fqdn || info.vm);
+          const emoji = chooseEmojiFallback(
+            info.fqdn || info.hostname || info.vm,
+          );
           const { name, meta } = ipHostLine(info);
           const title = `${name}${meta ? " • " + meta : ""}`;
 
@@ -906,7 +906,7 @@
           document.body.classList.contains("mode-cards") ? "cards" : "table",
         );
         const current = localStorage.getItem(PREF_VIEW_KEY) || "table";
-        viewBtn.textContent = current === "cards" ? "📋 Table" : "🗂 Cards";
+        viewBtn.textContent = current === "cards" ? "📋 Tabelle" : "🗂 Karten";
         load();
       });
       themeBtn.addEventListener("click", () => {
@@ -920,8 +920,32 @@
       });
 
       function chooseEmojiFallback(host) {
-        // Fallback only used when server doesn't provide emoji
-        // Server handles emoji mapping via emoji-map.json
+        const h = (host || "").toLowerCase();
+        // use fqdn
+        if (h.includes("nb-mailissa-1")) return "🍌";
+        if (h.includes("outlook2021-vl")) return "🍉";
+        if (h.includes("win11-test1")) return "🍎";
+        if (h.includes("win11-test2")) return "🍐";
+        if (h.includes("win11-test3")) return "🍊";
+        if (h.includes("win11-test4")) return "🐉";
+        if (h.includes("win11-test5")) return "🍋";
+        if (h.includes("win11-test6")) return "🍇";
+
+        if (h.includes("banane") || h.includes("banana")) return "🍌";
+        if (h.includes("local-vm-bier")) return "🍺";
+        if (h.includes("kirsche") || h.includes("cherry")) return "🍒";
+        if (h.includes("traube") || h.includes("grape")) return "🍇";
+        if (h.includes("zitrone") || h.includes("lemon")) return "🍋";
+        if (h.includes("melone") || h.includes("watermelon")) return "🍉";
+        if (h.includes("kiwi")) return "🥝";
+        if (h.includes("ananas") || h.includes("pineapple")) return "🍍";
+        if (h.includes("erdbeere") || h.includes("strawberry")) return "🍓";
+        if (h.includes("pfirsich") || h.includes("peach")) return "🍑";
+        if (h.includes("kaktus") || h.includes("cactus")) return "🌵";
+        if (h.includes("karotte") || h.includes("carrot")) return "🥕";
+        if (h.includes("apfel") || h.includes("apple")) return "🍎";
+        if (h.includes("birne") || h.includes("pear")) return "🍐";
+        if (h.includes("dev")) return "👨‍💻";
         return "💻";
       }
 
