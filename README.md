@@ -175,8 +175,11 @@ $trigger = New-ScheduledTaskTrigger -AtStartup
 
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
 
+# Disable the 3-day execution time limit (default would stop the task after 72h)
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero)
+
 Register-ScheduledTask -TaskName "RDP-Status-Client" `
-  -Action $action -Trigger $trigger -Principal $principal
+  -Action $action -Trigger $trigger -Principal $principal -Settings $settings
 ```
 
 ### Client Behavior
