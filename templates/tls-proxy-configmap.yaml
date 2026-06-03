@@ -1,0 +1,44 @@
+{{- $tlsProxy := .Values.tlsProxy | default dict }}
+{{- if ($tlsProxy.enabled | default false) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rdp-status.fullname" . }}-tls-proxy
+data:
+  default.conf: |
+    server {
+      listen {{ $tlsProxy.httpPort }};
+      server_name _;
+
+      location /api/status {
+        proxy_pass http://127.0.0.1:{{ $.Values.env.PORT }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header X-Forwarded-Host $host;
+      }
+
+      location / {
+        return 301 https://$host$request_uri;
+      }
+    }
+
+    server {
+      listen {{ $tlsProxy.port }} ssl;
+      server_name _;
+
+      ssl_certificate /etc/nginx/tls/tls.crt;
+      ssl_certificate_key /etc/nginx/tls/tls.key;
+      ssl_protocols TLSv1.2 TLSv1.3;
+      ssl_session_cache shared:SSL:10m;
+      ssl_session_timeout 10m;
+
+      location / {
+        proxy_pass http://127.0.0.1:{{ $.Values.env.PORT }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+      }
+    }
+{{- end }}
