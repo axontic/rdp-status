@@ -3,13 +3,10 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const dns = require("dns").promises;
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: "256kb" }));
-app.use(express.static(path.join(__dirname, "public")));
-
+// Configuration
 const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 60_000;
 const OFFLINE_MS = Number(process.env.OFFLINE_MS) || 150_000;
 const CONSOLE_COUNTS_AS_BUSY =
@@ -17,7 +14,26 @@ const CONSOLE_COUNTS_AS_BUSY =
 const USE_CLIENT_OCCUPANCY =
   (process.env.USE_CLIENT_OCCUPANCY || "true").toLowerCase() === "true";
 
-const state = Object.create(null);
+function loadMachineInfo(filePath, logger = console) {
+  if (!fs.existsSync(filePath)) return {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const result = {};
+    for (const [vm, description] of Object.entries(parsed)) {
+      if (typeof description !== "string" || !description.trim()) {
+        logger.warn(`Ignoring invalid machine information for ${vm}`);
+        continue;
+      }
+      result[vm] = description;
+    }
+    return result;
+  } catch (err) {
+    logger.warn(`Failed to load machine-info.json: ${err.message}`);
+    return {};
+  }
+}
+
+const machineInfo = loadMachineInfo(path.join(__dirname, "machine-info.json"));
 
 const toLower = (v) => (v ?? "").toString().toLowerCase().trim();
 
@@ -129,7 +145,14 @@ function chooseEmoji(host) {
   return "💻";
 }
 
-app.post("/api/status", async (req, res) => {
+function createApp({ machineInfo: descriptions = machineInfo, offlineMs = OFFLINE_MS } = {}) {
+  const app = express();
+  const state = Object.create(null);
+  app.use(cors());
+  app.use(express.json({ limit: "256kb" }));
+  app.use(express.static(path.join(__dirname, "public")));
+
+  app.post("/api/status", async (req, res) => {
   const {
     vm,
     ip,
@@ -204,28 +227,39 @@ app.post("/api/status", async (req, res) => {
   if (normSessions.length) console.log(`   sessions: ${sessLog}`);
 
   res.sendStatus(200);
-});
+  });
 
-app.get("/api/status", (_req, res) => {
+  app.get("/api/status", (_req, res) => {
   const now = Date.now();
   const result = {};
   for (const [vm, info] of Object.entries(state)) {
-    const offline = now - info.lastSeen > OFFLINE_MS;
+    const offline = now - info.lastSeen > offlineMs;
     result[vm] = {
       ...info,
       effectiveStatus: offline ? "OFFLINE" : info.status,
+      ...(descriptions[vm] ? { description: descriptions[vm] } : {}),
     };
   }
   res.json(result);
-});
+  });
 
-app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+  app.get("/", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+  });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () =>
-  console.log(
-    `RDP Status Server running on :${port} (HB=${HEARTBEAT_MS}ms, OFF=${OFFLINE_MS}ms, CONSOLE_BUSY=${CONSOLE_COUNTS_AS_BUSY}, USE_CLIENT_OCCUPANCY=${USE_CLIENT_OCCUPANCY})`,
-  ),
-);
+  return app;
+}
+
+function startServer() {
+  const app = createApp();
+  const port = process.env.PORT || 3000;
+  return app.listen(port, () =>
+    console.log(
+      `RDP Status Server running on :${port} (HB=${HEARTBEAT_MS}ms, OFF=${OFFLINE_MS}ms, CONSOLE_BUSY=${CONSOLE_COUNTS_AS_BUSY}, USE_CLIENT_OCCUPANCY=${USE_CLIENT_OCCUPANCY})`,
+    ),
+  );
+}
+
+if (require.main === module) startServer();
+
+module.exports = { createApp, loadMachineInfo, startServer };
