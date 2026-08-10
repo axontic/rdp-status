@@ -200,6 +200,28 @@
         gap: 8px;
         align-items: center;
       }
+      .machine-disclosure {
+        cursor: pointer;
+      }
+      .machine-disclosure:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 3px;
+      }
+      .details-hint {
+        color: var(--muted);
+        font-size: 11px;
+        margin-left: 6px;
+      }
+      .machine-description {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: var(--text);
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .machine-details td {
+        padding-top: 0;
+      }
 
       /* =========================
        TABLE LAYOUT
@@ -652,6 +674,7 @@
       let viewMode = DEFAULT_VIEW === "cards" ? "cards" : "table";
       let theme = DEFAULT_THEME === "light" ? "light" : "dark";
       let glowOn = DEFAULT_GLOW === "on";
+      const expandedMachines = new Set();
 
       // Init theme + mode + glow
       function applyTheme() {
@@ -682,6 +705,21 @@
           .replace(/"/g, "&quot;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;");
+      }
+
+      function escapeHtml(s) {
+        return String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function disclosureAttrs(info) {
+        if (!info.description) return "";
+        const expanded = expandedMachines.has(info.vm);
+        return `role="button" tabindex="0" data-vm="${escapeAttr(info.vm)}" aria-expanded="${expanded}"`;
       }
 
       function ipHostLine(info) {
@@ -785,14 +823,22 @@
 
           const lastEvt = info.lastEvent || {};
           const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
+          const expanded = expandedMachines.has(info.vm);
+          const disclosureClass = info.description ? " machine-disclosure" : "";
+          const hint = info.description
+            ? `<span class="details-hint">${expanded ? "▾ Hide details" : "▸ Details"}</span>`
+            : "";
+          const details = expanded
+            ? `<tr class="machine-details"><td colspan="4"><div class="machine-description">${escapeHtml(info.description)}</div></td></tr>`
+            : "";
 
           rows.push(`
-<tr class="${rowClass}">
+<tr class="${rowClass}${disclosureClass}" ${disclosureAttrs(info)}>
   <td>
     <div class="vm">
       <div class="emoji" title="${escapeAttr(info.vm)}">${emoji}</div>
       <div class="host" title="${escapeAttr(title)}">
-        <div class="name">${name}</div>
+        <div class="name">${escapeHtml(name)}${hint}</div>
         <div class="meta">${meta || "&nbsp;"}</div>
       </div>
     </div>
@@ -803,7 +849,7 @@
     <div>${lastEvtTxt}</div>
     <div class="fade">seen ${fmtRel(info.lastSeen)} ago</div>
   </td>
-</tr>`);
+</tr>${details}`);
         }
         vmBody.innerHTML =
           rows.join("") ||
@@ -844,20 +890,29 @@
 
           const lastEvt = info.lastEvent || {};
           const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
+          const expanded = expandedMachines.has(info.vm);
+          const disclosureClass = info.description ? " machine-disclosure" : "";
+          const hint = info.description
+            ? `<span class="details-hint">${expanded ? "▾ Hide details" : "▸ Details"}</span>`
+            : "";
+          const details = expanded
+            ? `<div class="machine-description">${escapeHtml(info.description)}</div>`
+            : "";
 
           cards.push(`
-<div class="${cardClass}">
+<div class="${cardClass}${disclosureClass}" ${disclosureAttrs(info)}>
   <div class="card-header">
     <div class="card-title" title="${escapeAttr(title)}">
       <div class="emoji" title="${escapeAttr(info.vm)}">${emoji}</div>
       <div style="min-width:0;">
-        <div class="name">${name}</div>
+        <div class="name">${escapeHtml(name)}${hint}</div>
         <div class="meta">${meta || "&nbsp;"}</div>
       </div>
     </div>
     <div class="status-wrap">${statusChip(eff)}</div>
   </div>
   <div class="counts" title="RDP: ${info.rdp_active_count ?? 0} | Disc: ${info.rdp_disconnected_count ?? 0} | Cons: ${info.console_active_count ?? 0}">${counts}</div>
+  ${details}
   <div class="footer">
     <div class="fade mono">${lastEvtTxt}</div>
     <div class="fade">${fmtRel(info.lastSeen)} ago</div>
@@ -874,6 +929,10 @@
           const res = await fetch("/api/status", { cache: "no-store" });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const json = await res.json();
+          const present = new Set(Object.values(json).map((info) => info.vm));
+          for (const vm of expandedMachines) {
+            if (!present.has(vm)) expandedMachines.delete(vm);
+          }
 
           if (document.body.classList.contains("mode-cards")) renderCards(json);
           else renderTable(json);
@@ -893,6 +952,25 @@
       }
 
       // --- Events ---
+      function toggleMachine(target) {
+        const disclosure = target.closest(".machine-disclosure");
+        if (!disclosure) return;
+        const vm = disclosure.dataset.vm;
+        if (expandedMachines.has(vm)) expandedMachines.delete(vm);
+        else expandedMachines.add(vm);
+        load();
+      }
+
+      for (const container of [vmBody, gridEl]) {
+        container.addEventListener("click", (event) => toggleMachine(event.target));
+        container.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleMachine(event.target);
+          }
+        });
+      }
+
       refreshSel.addEventListener("change", () => {
         startTimer();
       });
