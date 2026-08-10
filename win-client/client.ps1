@@ -5,8 +5,18 @@ $timeoutS   = 2
 $heartbeatS = 60
 $quiet      = $true
 
-$considerDisconnectedAsBusy = $false  # $true => "Disconnected" counts as busy
-$consoleCountsAsBusy        = $false  # << Console does NOT count as busy
+# Collect IP and FQDN once at startup
+$clientIp   = try {
+    (Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex (
+        Get-NetRoute -DestinationPrefix '0.0.0.0/0' |
+        Sort-Object RouteMetric |
+        Select-Object -First 1 -ExpandProperty ifIndex
+    ) | Select-Object -First 1 -ExpandProperty IPAddress)
+} catch { $null }
+$clientFqdn = try { [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName } catch { $null }
+
+$considerDisconnectedAsBusy = $false  # $true => "Disconnected" counts as occupied
+$consoleCountsAsBusy        = $false  # << Do NOT count console as occupied
 
 $script:considerDisconnectedAsBusy = $considerDisconnectedAsBusy
 $script:consoleCountsAsBusy        = $consoleCountsAsBusy
@@ -14,14 +24,14 @@ $script:consoleCountsAsBusy        = $consoleCountsAsBusy
 $ProgressPreference = 'SilentlyContinue'
 $script:warnedInvalidUrl = $false
 
-$wcTypeName = 'Axontic.Net.WebClientWithTimeout'
+$wcTypeName = 'Mbb.Net.WebClientWithTimeout'
 if (-not ($wcTypeName -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.Net;
 using System.Text;
 
-namespace Axontic.Net {
+namespace Mbb.Net {
     public class WebClientWithTimeout : WebClient {
         public int Timeout { get; set; }
         public WebClientWithTimeout() { this.Timeout = 2000; } // ms
@@ -61,14 +71,14 @@ function Test-ServerUrlValid {
     } catch { return $false }
 }
 
-$wtsTypeName = 'Axontic.Net.Wts'
+$wtsTypeName = 'Mbb.Net.Wts'
 if (-not ($wtsTypeName -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace Axontic.Net {
+namespace Mbb.Net {
     public class Wts {
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         private struct WTS_SESSION_INFO {
@@ -103,7 +113,7 @@ namespace Axontic.Net {
             public string State;          // "Active" | "Connected" | "Disconnected" | "Unknown"
             public string User;           // DOMAIN\user (if available)
             public string Domain;
-            public int ProtocolType;      // 0 = Console, 2 = RDP (typisch)
+            public int ProtocolType;      // 0 = Console, 2 = RDP (typical)
         }
 
         public static SessionInfo[] EnumSessions() {
@@ -187,7 +197,7 @@ function Get-SessionSnapshot {
     $sessions = @()
 
     try {
-        $wtsSessions = [Axontic.Net.Wts]::EnumSessions()
+        $wtsSessions = [Mbb.Net.Wts]::EnumSessions()
     } catch {
         $wtsSessions = @()
     }
@@ -267,7 +277,7 @@ function Send-Event {
 
     if (-not (Test-ServerUrlValid $serverUrl)) {
         if (-not $script:warnedInvalidUrl -and -not $quiet) {
-            Write-Warning "Invalid server URL: $serverUrl (events will not be sent, script continues)"
+            Write-Warning "Ungültige Server-URL: $serverUrl (Ereignisse werden nicht gesendet, Skript läuft weiter)"
         }
         $script:warnedInvalidUrl = $true
         return
@@ -278,6 +288,10 @@ function Send-Event {
 
     $payload = [ordered]@{
         vm        = $vm
+        ip        = $clientIp
+        fqdn      = $clientFqdn
+        rdns      = $clientRdns
+        dnsA      = $clientDnsA
         ts        = (Get-Date).ToString('o')
         event     = $Event
         user      = $userText
@@ -297,17 +311,18 @@ function Send-Event {
 
     try {
         $json    = $payload | ConvertTo-Json -Depth 6
+        Write-Host ("[SEND] $Event  ip=$clientIp  fqdn=$clientFqdn") -ForegroundColor Yellow
         $wc      = New-RestClient -TimeoutMs ($timeoutS * 1000)
         [void]$wc.UploadString($serverUrl, 'POST', $json)
 
         if (-not $quiet) {
-            Write-Output ("[{0}] Sent: {1} {2}" -f (Get-Date -Format "HH:mm:ss"), $Event, $userText)
+            Write-Output ("[{0}] Gesendet: {1} {2}" -f (Get-Date -Format "HH:mm:ss"), $Event, $userText)
         }
     } catch {
         if (-not $quiet) {
-            Write-Output ("[{0}] Send error (offline?): {1}" -f (Get-Date -Format "HH:mm:ss"), $Event)
+            Write-Output ("[{0}] Sendefehler (offline?): {1}" -f (Get-Date -Format "HH:mm:ss"), $Event)
         }
-        # never terminate
+        # never exit
     }
 }
 
@@ -351,9 +366,9 @@ try {
     Unregister-Event -SourceIdentifier 'SessionEvents' -ErrorAction SilentlyContinue | Out-Null
     $null = Register-WmiEvent -Class Win32_SessionChangeEvent -SourceIdentifier 'SessionEvents'
     $sessionEventRegistered = $true
-    if (-not $quiet) { Write-Output "SessionChange events subscribed." }
+    if (-not $quiet) { Write-Output "SessionChange-Events abonniert." }
 } catch {
-    if (-not $quiet) { Write-Warning "SessionChange events not available, using polling fallback." }
+    if (-not $quiet) { Write-Warning "SessionChange-Events nicht verfügbar, nutze Polling-Fallback." }
     $sessionEventRegistered = $false
 }
 
@@ -374,7 +389,7 @@ if ($sessionEventRegistered) {
             }
 
             # Optional: re-subscribe every 30 min (robust against WMI hangs)
-            if (Get-Date -ge $reSubAt) {
+            if ((Get-Date) -ge $reSubAt) {
                 try {
                     Unregister-Event -SourceIdentifier 'SessionEvents' -ErrorAction SilentlyContinue | Out-Null
                     $null = Register-WmiEvent -Class Win32_SessionChangeEvent -SourceIdentifier 'SessionEvents'
@@ -385,7 +400,7 @@ if ($sessionEventRegistered) {
             Start-Sleep -Milliseconds 300
         }
 
-        if (Get-Date -ge $nextHeartbeat) {
+        if ((Get-Date) -ge $nextHeartbeat) {
             Send-Event -Event 'heartbeat' -User '' -SessionId -1
             $nextHeartbeat = (Get-Date).AddSeconds($heartbeatS)
         }
@@ -406,11 +421,11 @@ else {
             }
         } catch {
             if (-not $quiet) {
-                Write-Output ("[{0}] Polling fallback: exception occurred, continuing..." -f (Get-Date -Format "HH:mm:ss"))
+                Write-Output ("[{0}] Polling-Fallback: Ausnahmesituation, weiter..." -f (Get-Date -Format "HH:mm:ss"))
             }
         } finally {
             # <<< Heartbeat ALWAYS >>>
-            if (Get-Date -ge $nextHeartbeat) {
+            if ((Get-Date) -ge $nextHeartbeat) {
                 Send-Event -Event 'heartbeat' -User '' -SessionId -1
                 $nextHeartbeat = (Get-Date).AddSeconds($heartbeatS)
             }

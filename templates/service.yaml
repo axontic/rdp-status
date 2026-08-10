@@ -2,11 +2,25 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "rdp-status.fullname" . }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
   selector:
     app: {{ include "rdp-status.name" . }}
   ports:
+    {{- $tlsProxy := .Values.tlsProxy | default dict }}
+    {{- if ($tlsProxy.enabled | default false) }}
+    - port: 80
+      targetPort: http
+      name: http
     - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
-
+      targetPort: {{ .Values.service.targetPort }}
+      name: https
+    {{- else }}
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      name: http
+    {{- end }}

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "rdp-status.fullname" . }}
+{{- $tlsProxy := .Values.tlsProxy | default dict }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -17,7 +18,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - containerPort: {{ .Values.env.PORT }}
           env:
             - name: PORT
               value: "{{ .Values.env.PORT }}"
@@ -29,4 +30,30 @@ spec:
               value: "{{ .Values.env.CONSOLE_BUSY }}"
             - name: USE_CLIENT_OCCUPANCY
               value: "{{ .Values.env.USE_CLIENT_OCCUPANCY }}"
+        {{- if ($tlsProxy.enabled | default false) }}
+        - name: nginx-tls-proxy
+          image: "{{ $tlsProxy.image.repository }}:{{ $tlsProxy.image.tag }}"
+          imagePullPolicy: {{ $tlsProxy.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $tlsProxy.httpPort }}
+            - name: https
+              containerPort: {{ $tlsProxy.port }}
+          volumeMounts:
+            - name: tls-proxy-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: tls-proxy-cert
+              mountPath: /etc/nginx/tls
+              readOnly: true
+        {{- end }}
+      {{- if ($tlsProxy.enabled | default false) }}
+      volumes:
+        - name: tls-proxy-config
+          configMap:
+            name: {{ include "rdp-status.fullname" . }}-tls-proxy
+        - name: tls-proxy-cert
+          secret:
+            secretName: {{ $tlsProxy.secretName }}
+      {{- end }}
 

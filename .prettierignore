@@ -1,0 +1,3 @@
+# Helm templates use Go template syntax ({{ }}) which Prettier does not understand
+# and will corrupt by adding spaces inside the braces.
+templates/

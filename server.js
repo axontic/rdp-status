@@ -6,11 +6,6 @@ const path = require("path");
 const fs = require("fs");
 const dns = require("dns").promises;
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: "256kb" }));
-app.use(express.static(path.join(__dirname, "public")));
-
 // Configuration
 const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 60_000;
 const OFFLINE_MS = Number(process.env.OFFLINE_MS) || 150_000;
@@ -19,26 +14,29 @@ const CONSOLE_COUNTS_AS_BUSY =
 const USE_CLIENT_OCCUPANCY =
   (process.env.USE_CLIENT_OCCUPANCY || "true").toLowerCase() === "true";
 
-// Load emoji mapping from external config (if available)
-let emojiMap = { emojis: {}, default: "💻" };
-const emojiConfigPath = path.join(__dirname, "emoji-map.json");
-if (fs.existsSync(emojiConfigPath)) {
+function loadMachineInfo(filePath, logger = console) {
+  if (!fs.existsSync(filePath)) return {};
   try {
-    emojiMap = JSON.parse(fs.readFileSync(emojiConfigPath, "utf8"));
-    console.log(`Loaded emoji mapping from ${emojiConfigPath}`);
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const result = {};
+    for (const [vm, description] of Object.entries(parsed)) {
+      if (typeof description !== "string" || !description.trim()) {
+        logger.warn(`Ignoring invalid machine information for ${vm}`);
+        continue;
+      }
+      result[vm] = description;
+    }
+    return result;
   } catch (err) {
-    console.warn(`Failed to load emoji-map.json: ${err.message}`);
+    logger.warn(`Failed to load machine-info.json: ${err.message}`);
+    return {};
   }
 }
 
-const state = Object.create(null);
+const machineInfo = loadMachineInfo(path.join(__dirname, "machine-info.json"));
 
 const toLower = (v) => (v ?? "").toString().toLowerCase().trim();
 
-/**
- * Normalize session data to a consistent format.
- * Handles both English and German state names.
- */
 function normalizeSession(session) {
   const typeStr = toLower(session?.type || session?.session || "");
   const stateStrRaw = toLower(session?.state || "");
@@ -46,7 +44,6 @@ function normalizeSession(session) {
   if (typeStr.includes("console")) type = "console";
   else if (typeStr.includes("rdp")) type = "rdp";
 
-  // Normalize state names (support English and German)
   let stateStr = stateStrRaw;
   if (stateStrRaw.startsWith("act") || stateStrRaw.startsWith("aktiv"))
     stateStr = "active";
@@ -64,9 +61,6 @@ function normalizeSession(session) {
   return { user: session?.user ?? "", sessionId, type, state: stateStr };
 }
 
-/**
- * Derive session counts and overall status from session list.
- */
 function deriveCountsAndStatus(sessions = []) {
   const norm = Array.isArray(sessions) ? sessions.map(normalizeSession) : [];
   let rdp_active = 0,
@@ -95,9 +89,6 @@ function deriveCountsAndStatus(sessions = []) {
   };
 }
 
-/**
- * Extract status from client-provided occupancy data.
- */
 function statusFromClientOccupancy(occ) {
   if (!USE_CLIENT_OCCUPANCY || !occ?.status) return null;
   const s = toLower(occ.status);
@@ -107,24 +98,61 @@ function statusFromClientOccupancy(occ) {
   return null;
 }
 
-/**
- * Choose an emoji for a VM based on its hostname.
- * Uses external emoji-map.json if available, otherwise returns default.
- */
-function chooseEmoji(host) {
-  const h = toLower(host);
+// Manual IP → hostname overrides (takes priority over DNS reverse lookup)
+const IP_HOSTNAME_MAP = {
+  "192.168.29.151": "melone.we4it.com",
+  "192.168.29.205": "banane.we4it.com",
+  "192.168.28.211": "apfel.we4it.com",
+  "192.168.28.212": "birne.we4it.com",
+  "192.168.28.213": "orange.we4it.com",
+  "192.168.28.214": "drache.we4it.com",
+  "192.168.28.215": "limone.we4it.com",
+  "192.168.28.216": "weintraube.we4it.com",
+};
 
-  // Check each key in the emoji map
-  for (const [key, emoji] of Object.entries(emojiMap.emojis || {})) {
-    if (h.includes(key.toLowerCase())) {
-      return emoji;
-    }
-  }
-
-  return emojiMap.default || "💻";
+function resolveHostnameFromMap(ip) {
+  if (!ip) return null;
+  return IP_HOSTNAME_MAP[ip] || null;
 }
 
-app.post("/api/status", async (req, res) => {
+function chooseEmoji(host) {
+  const h = toLower(host);
+  // use fqdn
+  if (h.includes("nb-mailissa-1")) return "🍌";
+  if (h.includes("outlook2021-vl")) return "🍉";
+  if (h.includes("win11-test1")) return "🍎";
+  if (h.includes("win11-test2")) return "🍐";
+  if (h.includes("win11-test3")) return "🍊";
+  if (h.includes("win11-test4")) return "🐉";
+  if (h.includes("win11-test5")) return "🍋";
+  if (h.includes("win11-test6")) return "🍇";
+
+  if (h.includes("banane") || h.includes("banana")) return "🍌";
+  if (h.includes("local-vm-bier")) return "🍺";
+  if (h.includes("kirsche") || h.includes("cherry")) return "🍒";
+  if (h.includes("traube") || h.includes("grape")) return "🍇";
+  if (h.includes("zitrone") || h.includes("lemon")) return "🍋";
+  if (h.includes("melone") || h.includes("watermelon")) return "🍉";
+  if (h.includes("kiwi")) return "🥝";
+  if (h.includes("ananas") || h.includes("pineapple")) return "🍍";
+  if (h.includes("erdbeere") || h.includes("strawberry")) return "🍓";
+  if (h.includes("pfirsich") || h.includes("peach")) return "🍑";
+  if (h.includes("kaktus") || h.includes("cactus")) return "🌵";
+  if (h.includes("karotte") || h.includes("carrot")) return "🥕";
+  if (h.includes("apfel") || h.includes("apple")) return "🍎";
+  if (h.includes("birne") || h.includes("pear")) return "🍐";
+  if (h.includes("dev")) return "👨‍💻";
+  return "💻";
+}
+
+function createApp({ machineInfo: descriptions = machineInfo, offlineMs = OFFLINE_MS } = {}) {
+  const app = express();
+  const state = Object.create(null);
+  app.use(cors());
+  app.use(express.json({ limit: "256kb" }));
+  app.use(express.static(path.join(__dirname, "public")));
+
+  app.post("/api/status", async (req, res) => {
   const {
     vm,
     ip,
@@ -149,14 +177,18 @@ app.post("/api/status", async (req, res) => {
     statusFromSess === "BUSY" ? "BUSY" : (occStatus ?? statusFromSess);
 
   let resolvedRdns = rdns || null;
-  let hostname = rdns || fqdn || vm;
+  let hostname = fqdn || resolvedRdns || vm;
 
-  if (!resolvedRdns && ip) {
+  const mappedHostname = resolveHostnameFromMap(ip);
+  if (mappedHostname) {
+    resolvedRdns = resolvedRdns || mappedHostname;
+    hostname = mappedHostname;
+  } else if (!resolvedRdns && ip) {
     try {
       const names = await dns.reverse(ip);
       if (names?.length) {
         resolvedRdns = names[0];
-        if (!fqdn) hostname = resolvedRdns;
+        hostname = resolvedRdns;
       }
     } catch {
       /* ignore DNS errors */
@@ -195,28 +227,39 @@ app.post("/api/status", async (req, res) => {
   if (normSessions.length) console.log(`   sessions: ${sessLog}`);
 
   res.sendStatus(200);
-});
+  });
 
-app.get("/api/status", (_req, res) => {
+  app.get("/api/status", (_req, res) => {
   const now = Date.now();
   const result = {};
   for (const [vm, info] of Object.entries(state)) {
-    const offline = now - info.lastSeen > OFFLINE_MS;
+    const offline = now - info.lastSeen > offlineMs;
     result[vm] = {
       ...info,
       effectiveStatus: offline ? "OFFLINE" : info.status,
+      ...(descriptions[vm] ? { description: descriptions[vm] } : {}),
     };
   }
   res.json(result);
-});
+  });
 
-app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+  app.get("/", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+  });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () =>
-  console.log(
-    `RDP Status Server running on :${port} (HB=${HEARTBEAT_MS}ms, OFF=${OFFLINE_MS}ms, CONSOLE_BUSY=${CONSOLE_COUNTS_AS_BUSY}, USE_CLIENT_OCCUPANCY=${USE_CLIENT_OCCUPANCY})`,
-  ),
-);
+  return app;
+}
+
+function startServer() {
+  const app = createApp();
+  const port = process.env.PORT || 3000;
+  return app.listen(port, () =>
+    console.log(
+      `RDP Status Server running on :${port} (HB=${HEARTBEAT_MS}ms, OFF=${OFFLINE_MS}ms, CONSOLE_BUSY=${CONSOLE_COUNTS_AS_BUSY}, USE_CLIENT_OCCUPANCY=${USE_CLIENT_OCCUPANCY})`,
+    ),
+  );
+}
+
+if (require.main === module) startServer();
+
+module.exports = { createApp, loadMachineInfo, startServer };

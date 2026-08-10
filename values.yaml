@@ -1,13 +1,16 @@
 replicaCount: 1
 
 image:
-  repository: myregistry/rdp-status
-  tag: latest
+  repository: axontic.azurecr.io/rdp-status-dashboard
+  tag: 1.1.1
   pullPolicy: IfNotPresent
 
 service:
-  type: ClusterIP
-  port: 3000
+  type: LoadBalancer
+  port: 443
+  targetPort: https
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 
 env:
   PORT: 3000
@@ -16,3 +19,14 @@ env:
   CONSOLE_BUSY: "false"
   USE_CLIENT_OCCUPANCY: "true"
 
+tlsProxy:
+  enabled: true
+  httpPort: 8080
+  secretName: rdp-status-tls
+  port: 8443
+  hosts:
+    - rdp-status.we4it.com
+  image:
+    repository: nginx
+    tag: 1.27-alpine
+    pullPolicy: IfNotPresent

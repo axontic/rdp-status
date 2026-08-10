@@ -1,0 +1,12 @@
+# Patterns to ignore when building packages.
+.git
+.gitignore
+.dockerignore
+.helmignore
+Dockerfile
+node_modules/
+*.log
+*.tmp
+.DS_Store
+.idea/
+.vscode/
