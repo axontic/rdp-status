@@ -17,6 +17,7 @@ A real-time dashboard showing which Windows VMs are currently in use via RDP ses
 - **Multiple views** - Switch between table and card layouts
 - **Heartbeat system** - Automatic offline detection when VMs stop reporting
 - **Event tracking** - See last activity (connect, disconnect, logon, logoff)
+- **Machine information** - Keep hardware, installed software, and other notes with each VM
 - **Kubernetes ready** - Includes Helm chart for easy deployment
 
 ## Status Indicators
@@ -96,6 +97,31 @@ $env:RDP_STATUS_SERVER_URL = "http://your-server:3000/api/status"
 
 Or edit `client.ps1` directly to change the default fallback URL.
 
+### Machine Information
+
+Copy `machine-info.example.json` to `machine-info.json` in the application
+root and add plain-text notes keyed by the VM identifier:
+
+```json
+{
+  "VM-CAD-01": "Hardware: 16 GB RAM, NVIDIA RTX 4060\nSoftware: CAD 2026"
+}
+```
+
+Keys match the client's `vm` value exactly and case-sensitively. Empty or
+non-string values are ignored. Restart the server after changing the file.
+Machines with information show an expandable **Details** control in table and
+card views.
+
+For Docker Compose, mount the local file read-only:
+
+```yaml
+services:
+  rdp-status:
+    volumes:
+      - ./machine-info.json:/app/machine-info.json:ro
+```
+
 ## API Reference
 
 ### POST /api/status
@@ -141,6 +167,7 @@ Retrieve status of all VMs.
     "hostname": "vm-name.local",
     "status": "BUSY",
     "effectiveStatus": "BUSY",
+    "description": "Hardware: 16 GB RAM\nSoftware: CAD 2026",
     "rdp_active_count": 1,
     "rdp_disconnected_count": 0,
     "console_active_count": 0,
