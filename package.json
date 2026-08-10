@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "node --test"
   },
   "keywords": [
     "rdp",
