@@ -1,9 +1,14 @@
+param(
+    [switch]$Once,
+    [switch]$InventoryOnly
+)
+
 # Server URL - set via environment variable or use fallback
 $serverUrl  = if ($env:RDP_STATUS_SERVER_URL) { $env:RDP_STATUS_SERVER_URL } else { "http://localhost:3000/api/status" }
 $vm         = $env:COMPUTERNAME
 $timeoutS   = 2
 $heartbeatS = 60
-$quiet      = $true
+$quiet      = -not ($Once -or $InventoryOnly)
 
 # Collect IP and FQDN once at startup
 $clientIp   = try {
@@ -23,6 +28,79 @@ $script:consoleCountsAsBusy        = $consoleCountsAsBusy
 
 $ProgressPreference = 'SilentlyContinue'
 $script:warnedInvalidUrl = $false
+$script:machineInventory = $null
+$script:lastSendSucceeded = $false
+
+function Get-MachineInventory {
+    $ramGb = $null
+    $gpus = @()
+    try {
+        $computer = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        if ($computer.TotalPhysicalMemory) {
+            $ramGb = [math]::Round([double]$computer.TotalPhysicalMemory / 1GB, 1)
+        }
+    } catch { }
+
+    try {
+        $gpus = @(
+            Get-CimInstance -ClassName Win32_VideoController -ErrorAction Stop |
+                Where-Object { $_.Name } |
+                Select-Object -ExpandProperty Name -Unique
+        )
+    } catch { }
+
+    $outlook = $null
+    $outlookPaths = @(
+        "$env:ProgramFiles\Microsoft Office\root\Office16\OUTLOOK.EXE",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Office16\OUTLOOK.EXE",
+        "$env:ProgramFiles\Microsoft Office\Office16\OUTLOOK.EXE",
+        "${env:ProgramFiles(x86)}\Microsoft Office\Office16\OUTLOOK.EXE"
+    )
+    $outlookPath = $outlookPaths |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_) } |
+        Select-Object -First 1
+
+    if ($outlookPath) {
+        try {
+            $versionInfo = (Get-Item -LiteralPath $outlookPath -ErrorAction Stop).VersionInfo
+            $fullVersion = $versionInfo.ProductVersion
+            if (-not $fullVersion) { $fullVersion = $versionInfo.FileVersion }
+            $build = $fullVersion -replace '^16\.0\.', ''
+            $buildFamily = ($build -split '\.')[0]
+
+            # Office does not expose labels such as "2408" as an executable
+            # version. Known labels can be mapped by build family or supplied
+            # with RDP_STATUS_OUTLOOK_RELEASE (for example, 2408).
+            $releaseByBuild = @{
+                '17932' = '2408'
+            }
+            $release = if ($env:RDP_STATUS_OUTLOOK_RELEASE) {
+                $env:RDP_STATUS_OUTLOOK_RELEASE.Trim()
+            } else {
+                $releaseByBuild[$buildFamily]
+            }
+            $displayName = if ($release -and $release.Length -ge 2) {
+                "Outlook $($release.Substring(0, 2))"
+            } else {
+                'Outlook'
+            }
+
+            $outlook = [ordered]@{
+                displayName      = $displayName
+                release          = $release
+                build            = $build
+                fullVersion      = $fullVersion
+                installationType = 'Click-to-Run'
+            }
+        } catch { }
+    }
+
+    return [ordered]@{
+        ramGb   = $ramGb
+        gpus    = @($gpus)
+        outlook = $outlook
+    }
+}
 
 $wcTypeName = 'Mbb.Net.WebClientWithTimeout'
 if (-not ($wcTypeName -as [type])) {
@@ -276,6 +354,7 @@ function Send-Event {
     )
 
     if (-not (Test-ServerUrlValid $serverUrl)) {
+        $script:lastSendSucceeded = $false
         if (-not $script:warnedInvalidUrl -and -not $quiet) {
             Write-Warning "Ungültige Server-URL: $serverUrl (Ereignisse werden nicht gesendet, Skript läuft weiter)"
         }
@@ -296,6 +375,7 @@ function Send-Event {
         event     = $Event
         user      = $userText
         sessionId = $SessionId
+        inventory = $script:machineInventory
         occupancy = $snap.Occupancy
         sessions  = @(
             $snap.Sessions | ForEach-Object {
@@ -310,17 +390,19 @@ function Send-Event {
     }
 
     try {
+        $script:lastSendSucceeded = $false
         $json    = $payload | ConvertTo-Json -Depth 6
         Write-Host ("[SEND] $Event  ip=$clientIp  fqdn=$clientFqdn") -ForegroundColor Yellow
         $wc      = New-RestClient -TimeoutMs ($timeoutS * 1000)
         [void]$wc.UploadString($serverUrl, 'POST', $json)
+        $script:lastSendSucceeded = $true
 
         if (-not $quiet) {
             Write-Output ("[{0}] Gesendet: {1} {2}" -f (Get-Date -Format "HH:mm:ss"), $Event, $userText)
         }
     } catch {
         if (-not $quiet) {
-            Write-Output ("[{0}] Sendefehler (offline?): {1}" -f (Get-Date -Format "HH:mm:ss"), $Event)
+            Write-Warning ("[{0}] Sendefehler: {1} ({2})" -f (Get-Date -Format "HH:mm:ss"), $Event, $_.Exception.Message)
         }
         # never exit
     }
@@ -358,8 +440,26 @@ function Map-And-Send {
     }
 }
 
+$script:machineInventory = Get-MachineInventory
+if ($Once -or $InventoryOnly) {
+    Write-Output 'Collected machine inventory:'
+    Write-Output ($script:machineInventory | ConvertTo-Json -Depth 5)
+}
+
+if ($InventoryOnly) {
+    exit 0
+}
+
 Send-Event -Event 'vm_online' -User '' -SessionId -1
 
+if ($Once) {
+    if ($script:lastSendSucceeded) {
+        Write-Output "One-shot status report successfully sent to $serverUrl"
+        exit 0
+    }
+    Write-Error "One-shot status report could not be sent to $serverUrl"
+    exit 1
+}
 
 $sessionEventRegistered = $false
 try {
