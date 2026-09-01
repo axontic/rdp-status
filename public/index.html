@@ -200,17 +200,24 @@
         gap: 8px;
         align-items: center;
       }
-      .machine-disclosure {
-        cursor: pointer;
-      }
-      .machine-disclosure:focus-visible {
-        outline: 2px solid var(--text);
-        outline-offset: 3px;
-      }
-      .details-hint {
+      .details-button {
+        appearance: none;
+        border: 0;
+        background: transparent;
         color: var(--muted);
+        cursor: pointer;
+        font: inherit;
         font-size: 11px;
         margin-left: 6px;
+        padding: 2px 4px;
+      }
+      .details-button:hover {
+        color: var(--text);
+      }
+      .details-button:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
+        border-radius: 3px;
       }
       .machine-description {
         white-space: pre-wrap;
@@ -218,6 +225,26 @@
         color: var(--text);
         padding: 10px 12px;
         border-top: 1px solid var(--border);
+      }
+      .inventory-grid {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 6px 14px;
+        margin: 0;
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .inventory-grid dt {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .inventory-grid dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .machine-description + .inventory-grid,
+      .inventory-grid + .machine-description {
+        margin-top: 10px;
       }
       .machine-details td {
         padding-top: 0;
@@ -432,9 +459,6 @@
       }
 
       /* Glow only when body has the class glow-on */
-      .glow-busy {
-        /* no animation by default */
-      }
       .glow-on .glow-busy {
         animation: busyGlow 1.6s ease-in-out infinite;
       }
@@ -716,10 +740,59 @@
           .replace(/'/g, "&#39;");
       }
 
-      function disclosureAttrs(info) {
-        if (!info.description) return "";
+      function hasMachineDetails(info) {
+        const inventory = info.inventory;
+        return Boolean(
+          info.description ||
+          (inventory &&
+            (inventory.ramGb || inventory.gpus?.length || inventory.outlook)),
+        );
+      }
+
+      function renderMachineDetails(info) {
+        const sections = [];
+        if (info.description) {
+          sections.push(
+            `<div class="machine-description">${escapeHtml(info.description)}</div>`,
+          );
+        }
+
+        const inventory = info.inventory;
+        if (inventory) {
+          const rows = [];
+          if (inventory.ramGb) {
+            rows.push(`<dt>RAM</dt><dd>${escapeHtml(inventory.ramGb)} GB</dd>`);
+          }
+          if (Array.isArray(inventory.gpus) && inventory.gpus.length) {
+            rows.push(
+              `<dt>GPU</dt><dd>${inventory.gpus.map(escapeHtml).join("<br>")}</dd>`,
+            );
+          }
+          if (inventory.outlook) {
+            const outlook = inventory.outlook;
+            const parts = [];
+            if (outlook.displayName) parts.push(outlook.displayName);
+            if (outlook.release) parts.push(`Version ${outlook.release}`);
+            if (outlook.build) parts.push(`Build ${outlook.build}`);
+            if (outlook.installationType) parts.push(outlook.installationType);
+            if (parts.length) {
+              rows.push(
+                `<dt>Outlook</dt><dd>${parts.map(escapeHtml).join(" · ")}</dd>`,
+              );
+            }
+          }
+          if (rows.length) {
+            sections.push(`<dl class="inventory-grid">${rows.join("")}</dl>`);
+          }
+        }
+
+        return sections.join("");
+      }
+
+      function detailsButton(info) {
+        if (!hasMachineDetails(info)) return "";
         const expanded = expandedMachines.has(info.vm);
-        return `role="button" tabindex="0" data-vm="${escapeAttr(info.vm)}" aria-expanded="${expanded}"`;
+        return `<button type="button" class="details-button" data-vm="${escapeAttr(info.vm)}" aria-expanded="${expanded}" aria-label="${expanded ? "Hide" : "Show"} details for ${escapeAttr(info.vm)}">${expanded ? "▾ Hide details" : "▸ Details"}</button>`;
       }
 
       function ipHostLine(info) {
@@ -824,21 +897,20 @@
           const lastEvt = info.lastEvent || {};
           const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
           const expanded = expandedMachines.has(info.vm);
-          const disclosureClass = info.description ? " machine-disclosure" : "";
-          const hint = info.description
-            ? `<span class="details-hint">${expanded ? "▾ Hide details" : "▸ Details"}</span>`
-            : "";
-          const details = expanded
-            ? `<tr class="machine-details"><td colspan="4"><div class="machine-description">${escapeHtml(info.description)}</div></td></tr>`
-            : "";
+          const hasDetails = hasMachineDetails(info);
+          const detailsControl = detailsButton(info);
+          const details =
+            expanded && hasDetails
+              ? `<tr class="machine-details"><td colspan="4">${renderMachineDetails(info)}</td></tr>`
+              : "";
 
           rows.push(`
-<tr class="${rowClass}${disclosureClass}" ${disclosureAttrs(info)}>
+<tr class="${rowClass}">
   <td>
     <div class="vm">
       <div class="emoji" title="${escapeAttr(info.vm)}">${emoji}</div>
       <div class="host" title="${escapeAttr(title)}">
-        <div class="name">${escapeHtml(name)}${hint}</div>
+        <div class="name">${escapeHtml(name)}${detailsControl}</div>
         <div class="meta">${meta || "&nbsp;"}</div>
       </div>
     </div>
@@ -891,21 +963,18 @@
           const lastEvt = info.lastEvent || {};
           const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
           const expanded = expandedMachines.has(info.vm);
-          const disclosureClass = info.description ? " machine-disclosure" : "";
-          const hint = info.description
-            ? `<span class="details-hint">${expanded ? "▾ Hide details" : "▸ Details"}</span>`
-            : "";
-          const details = expanded
-            ? `<div class="machine-description">${escapeHtml(info.description)}</div>`
-            : "";
+          const hasDetails = hasMachineDetails(info);
+          const detailsControl = detailsButton(info);
+          const details =
+            expanded && hasDetails ? renderMachineDetails(info) : "";
 
           cards.push(`
-<div class="${cardClass}${disclosureClass}" ${disclosureAttrs(info)}>
+<div class="${cardClass}">
   <div class="card-header">
     <div class="card-title" title="${escapeAttr(title)}">
       <div class="emoji" title="${escapeAttr(info.vm)}">${emoji}</div>
       <div style="min-width:0;">
-        <div class="name">${escapeHtml(name)}${hint}</div>
+        <div class="name">${escapeHtml(name)}${detailsControl}</div>
         <div class="meta">${meta || "&nbsp;"}</div>
       </div>
     </div>
@@ -953,22 +1022,18 @@
 
       // --- Events ---
       function toggleMachine(target) {
-        const disclosure = target.closest(".machine-disclosure");
-        if (!disclosure) return;
-        const vm = disclosure.dataset.vm;
+        const button = target.closest(".details-button");
+        if (!button) return;
+        const vm = button.dataset.vm;
         if (expandedMachines.has(vm)) expandedMachines.delete(vm);
         else expandedMachines.add(vm);
         load();
       }
 
       for (const container of [vmBody, gridEl]) {
-        container.addEventListener("click", (event) => toggleMachine(event.target));
-        container.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            toggleMachine(event.target);
-          }
-        });
+        container.addEventListener("click", (event) =>
+          toggleMachine(event.target),
+        );
       }
 
       refreshSel.addEventListener("change", () => {
