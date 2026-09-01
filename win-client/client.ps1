@@ -3,8 +3,8 @@ param(
     [switch]$InventoryOnly
 )
 
-# Server URL - set via environment variable or use fallback
-$serverUrl  = if ($env:RDP_STATUS_SERVER_URL) { $env:RDP_STATUS_SERVER_URL } else { "http://localhost:3000/api/status" }
+# Server URL - optionally override the production URL with an environment variable
+$serverUrl  = if ($env:RDP_STATUS_SERVER_URL) { $env:RDP_STATUS_SERVER_URL } else { "https://rdp-status.we4it.com/api/status" }
 $vm         = $env:COMPUTERNAME
 $timeoutS   = 2
 $heartbeatS = 60
@@ -19,6 +19,16 @@ $clientIp   = try {
     ) | Select-Object -First 1 -ExpandProperty IPAddress)
 } catch { $null }
 $clientFqdn = try { [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName } catch { $null }
+$clientRdns = try { [System.Net.Dns]::GetHostEntry($clientIp).HostName } catch { $null }
+$clientDnsA = try {
+    (Resolve-DnsName -Name $env:COMPUTERNAME -Type A -ErrorAction Stop |
+        Where-Object { $_.Type -eq 'A' } |
+        Select-Object -First 1).IPAddress
+} catch { $null }
+
+if (-not $quiet) {
+    Write-Host ("[INIT] VM=$vm  IP=$clientIp  FQDN=$clientFqdn  rDNS=$clientRdns  DNS-A=$clientDnsA") -ForegroundColor Cyan
+}
 
 $considerDisconnectedAsBusy = $false  # $true => "Disconnected" counts as occupied
 $consoleCountsAsBusy        = $false  # << Do NOT count console as occupied
