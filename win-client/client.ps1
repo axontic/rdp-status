@@ -82,7 +82,7 @@ function Get-MachineInventory {
             # version. Known labels can be mapped by build family or supplied
             # with RDP_STATUS_OUTLOOK_RELEASE (for example, 2408).
             $releaseByBuild = @{
-                '17932' = '2408',
+                '17932' = '2408'
                 '14334' = '2108'
             }
             $release = if ($env:RDP_STATUS_OUTLOOK_RELEASE) {
