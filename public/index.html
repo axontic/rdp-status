@@ -200,17 +200,47 @@
         gap: 8px;
         align-items: center;
       }
-      .machine-disclosure {
-        cursor: pointer;
-      }
-      .machine-disclosure:focus-visible {
-        outline: 2px solid var(--text);
-        outline-offset: 3px;
-      }
-      .details-hint {
+      .details-button {
+        appearance: none;
+        border: 0;
+        background: transparent;
         color: var(--muted);
+        cursor: pointer;
+        font: inherit;
         font-size: 11px;
         margin-left: 6px;
+        padding: 2px 4px;
+      }
+      .details-button:hover {
+        color: var(--text);
+      }
+      .details-button:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
+        border-radius: 3px;
+      }
+      .card-info-button {
+        display: inline-grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        background: var(--chip-bg);
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 14px;
+        line-height: 1;
+      }
+      .card-info-button:hover {
+        color: var(--text);
+        border-color: var(--muted);
+      }
+      .card-info-button:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
       }
       .machine-description {
         white-space: pre-wrap;
@@ -218,6 +248,26 @@
         color: var(--text);
         padding: 10px 12px;
         border-top: 1px solid var(--border);
+      }
+      .inventory-grid {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 6px 14px;
+        margin: 0;
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .inventory-grid dt {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .inventory-grid dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .machine-description + .inventory-grid,
+      .inventory-grid + .machine-description {
+        margin-top: 10px;
       }
       .machine-details td {
         padding-top: 0;
@@ -432,9 +482,6 @@
       }
 
       /* Glow only when body has the class glow-on */
-      .glow-busy {
-        /* no animation by default */
-      }
       .glow-on .glow-busy {
         animation: busyGlow 1.6s ease-in-out infinite;
       }
@@ -520,6 +567,7 @@
         display: flex;
         align-items: center;
         justify-content: flex-end;
+        gap: 8px;
         margin-left: 12px;
       }
 
@@ -716,10 +764,79 @@
           .replace(/'/g, "&#39;");
       }
 
-      function disclosureAttrs(info) {
-        if (!info.description) return "";
+      function hasMachineDetails(info) {
+        const inventory = info.inventory;
+        return Boolean(
+          info.description ||
+          (inventory && (inventory.ramGb || inventory.os || inventory.outlook)),
+        );
+      }
+
+      function renderMachineDetails(info) {
+        const sections = [];
+        if (info.description) {
+          sections.push(
+            `<div class="machine-description">${escapeHtml(info.description)}</div>`,
+          );
+        }
+
+        const inventory = info.inventory;
+        if (inventory) {
+          const rows = [];
+          if (inventory.ramGb) {
+            rows.push(`<dt>RAM</dt><dd>${escapeHtml(inventory.ramGb)} GB</dd>`);
+          }
+          if (inventory.os) {
+            const os = inventory.os;
+            const windowsParts = [];
+            if (os.productName) windowsParts.push(os.productName);
+            if (os.displayVersion) windowsParts.push(os.displayVersion);
+            if (os.build) windowsParts.push(`Build ${os.build}`);
+            if (windowsParts.length) {
+              rows.push(
+                `<dt>Windows</dt><dd>${windowsParts.map(escapeHtml).join(" · ")}</dd>`,
+              );
+            }
+
+            const updateParts = [];
+            if (os.lastUpdateId) updateParts.push(os.lastUpdateId);
+            if (os.lastUpdateDate) updateParts.push(os.lastUpdateDate);
+            if (os.lastUpdateDetails) updateParts.push(os.lastUpdateDetails);
+            if (updateParts.length) {
+              rows.push(
+                `<dt>Last update</dt><dd>${updateParts.map(escapeHtml).join(" · ")}</dd>`,
+              );
+            }
+          }
+          if (inventory.outlook) {
+            const outlook = inventory.outlook;
+            const parts = [];
+            if (outlook.displayName) parts.push(outlook.displayName);
+            if (outlook.release) parts.push(`Version ${outlook.release}`);
+            if (outlook.build) parts.push(`Build ${outlook.build}`);
+            if (parts.length) {
+              rows.push(
+                `<dt>Outlook</dt><dd>${parts.map(escapeHtml).join(" · ")}</dd>`,
+              );
+            }
+          }
+          if (rows.length) {
+            sections.push(`<dl class="inventory-grid">${rows.join("")}</dl>`);
+          }
+        }
+
+        return sections.join("");
+      }
+
+      function detailsButton(info) {
+        if (!hasMachineDetails(info)) return "";
         const expanded = expandedMachines.has(info.vm);
-        return `role="button" tabindex="0" data-vm="${escapeAttr(info.vm)}" aria-expanded="${expanded}"`;
+        return `<button type="button" class="details-button" data-vm="${escapeAttr(info.vm)}" aria-expanded="${expanded}" aria-label="${expanded ? "Hide" : "Show"} details for ${escapeAttr(info.vm)}">${expanded ? "▾ Hide details" : "▸ Details"}</button>`;
+      }
+
+      function cardInfoButton(info) {
+        if (!hasMachineDetails(info)) return "";
+        return `<button type="button" class="card-info-button" data-vm="${escapeAttr(info.vm)}" aria-label="Show details for ${escapeAttr(info.vm)} in table view" title="Show details in table view">ⓘ</button>`;
       }
 
       function ipHostLine(info) {
@@ -824,21 +941,20 @@
           const lastEvt = info.lastEvent || {};
           const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
           const expanded = expandedMachines.has(info.vm);
-          const disclosureClass = info.description ? " machine-disclosure" : "";
-          const hint = info.description
-            ? `<span class="details-hint">${expanded ? "▾ Hide details" : "▸ Details"}</span>`
-            : "";
-          const details = expanded
-            ? `<tr class="machine-details"><td colspan="4"><div class="machine-description">${escapeHtml(info.description)}</div></td></tr>`
-            : "";
+          const hasDetails = hasMachineDetails(info);
+          const detailsControl = detailsButton(info);
+          const details =
+            expanded && hasDetails
+              ? `<tr class="machine-details"><td colspan="4">${renderMachineDetails(info)}</td></tr>`
+              : "";
 
           rows.push(`
-<tr class="${rowClass}${disclosureClass}" ${disclosureAttrs(info)}>
+<tr class="${rowClass}">
   <td>
     <div class="vm">
       <div class="emoji" title="${escapeAttr(info.vm)}">${emoji}</div>
       <div class="host" title="${escapeAttr(title)}">
-        <div class="name">${escapeHtml(name)}${hint}</div>
+        <div class="name">${escapeHtml(name)}${detailsControl}</div>
         <div class="meta">${meta || "&nbsp;"}</div>
       </div>
     </div>
@@ -890,29 +1006,21 @@
 
           const lastEvt = info.lastEvent || {};
           const lastEvtTxt = `${lastEvt.event || "-"}${lastEvt.user ? " • " + lastEvt.user : ""}`;
-          const expanded = expandedMachines.has(info.vm);
-          const disclosureClass = info.description ? " machine-disclosure" : "";
-          const hint = info.description
-            ? `<span class="details-hint">${expanded ? "▾ Hide details" : "▸ Details"}</span>`
-            : "";
-          const details = expanded
-            ? `<div class="machine-description">${escapeHtml(info.description)}</div>`
-            : "";
+          const infoControl = cardInfoButton(info);
 
           cards.push(`
-<div class="${cardClass}${disclosureClass}" ${disclosureAttrs(info)}>
+<div class="${cardClass}">
   <div class="card-header">
     <div class="card-title" title="${escapeAttr(title)}">
       <div class="emoji" title="${escapeAttr(info.vm)}">${emoji}</div>
       <div style="min-width:0;">
-        <div class="name">${escapeHtml(name)}${hint}</div>
+        <div class="name">${escapeHtml(name)}</div>
         <div class="meta">${meta || "&nbsp;"}</div>
       </div>
     </div>
-    <div class="status-wrap">${statusChip(eff)}</div>
+    <div class="status-wrap">${infoControl}${statusChip(eff)}</div>
   </div>
   <div class="counts" title="RDP: ${info.rdp_active_count ?? 0} | Disc: ${info.rdp_disconnected_count ?? 0} | Cons: ${info.console_active_count ?? 0}">${counts}</div>
-  ${details}
   <div class="footer">
     <div class="fade mono">${lastEvtTxt}</div>
     <div class="fade">${fmtRel(info.lastSeen)} ago</div>
@@ -953,23 +1061,41 @@
 
       // --- Events ---
       function toggleMachine(target) {
-        const disclosure = target.closest(".machine-disclosure");
-        if (!disclosure) return;
-        const vm = disclosure.dataset.vm;
+        const button = target.closest(".details-button");
+        if (!button) return;
+        const vm = button.dataset.vm;
         if (expandedMachines.has(vm)) expandedMachines.delete(vm);
         else expandedMachines.add(vm);
         load();
       }
 
-      for (const container of [vmBody, gridEl]) {
-        container.addEventListener("click", (event) => toggleMachine(event.target));
-        container.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            toggleMachine(event.target);
-          }
-        });
+      async function showCardDetails(target) {
+        const button = target.closest(".card-info-button");
+        if (!button) return;
+
+        const vm = button.dataset.vm;
+        expandedMachines.add(vm);
+        viewMode = "table";
+        localStorage.setItem(PREF_VIEW_KEY, viewMode);
+        applyViewMode();
+        await load();
+
+        const tableButton = Array.from(
+          vmBody.querySelectorAll(".details-button"),
+        ).find((candidate) => candidate.dataset.vm === vm);
+        if (tableButton) {
+          tableButton.closest("tr")?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          tableButton.focus();
+        }
       }
+
+      vmBody.addEventListener("click", (event) => toggleMachine(event.target));
+      gridEl.addEventListener("click", (event) =>
+        showCardDetails(event.target),
+      );
 
       refreshSel.addEventListener("change", () => {
         startTimer();

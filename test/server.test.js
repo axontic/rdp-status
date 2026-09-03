@@ -37,9 +37,12 @@ test("ignores invalid machine descriptions and warns", (t) => {
   );
   const warnings = [];
 
-  assert.deepEqual(loadMachineInfo(filePath, { warn: (text) => warnings.push(text) }), {
-    valid: "Description",
-  });
+  assert.deepEqual(
+    loadMachineInfo(filePath, { warn: (text) => warnings.push(text) }),
+    {
+      valid: "Description",
+    },
+  );
   assert.equal(warnings.length, 2);
 });
 
@@ -116,4 +119,72 @@ test("uses the injected offline threshold", async (t) => {
     response.json(),
   );
   assert.equal(body["VM-OFFLINE"].effectiveStatus, "OFFLINE");
+});
+
+test("validates and exposes inventory reported by a client", async (t) => {
+  const baseUrl = await withServer(t);
+  await postStatus(baseUrl, {
+    vm: "VM-INVENTORY",
+    inventory: {
+      ramGb: 16,
+      os: {
+        productName: "Microsoft Windows 11 Enterprise",
+        displayVersion: "24H2",
+        build: "26100.4946",
+        lastUpdateId: "KB5063878",
+        lastUpdateDate: "2026-08-28",
+        lastUpdateDetails: "Security Update",
+        untrustedField: "ignored",
+      },
+      outlook: {
+        displayName: "Outlook 24",
+        release: "2408",
+        build: "17932.20910",
+        fullVersion: "16.0.17932.20910",
+        untrustedField: "ignored",
+      },
+      untrustedField: "ignored",
+    },
+  });
+
+  const body = await fetch(`${baseUrl}/api/status`).then((response) =>
+    response.json(),
+  );
+  assert.deepEqual(body["VM-INVENTORY"].inventory, {
+    ramGb: 16,
+    os: {
+      productName: "Microsoft Windows 11 Enterprise",
+      displayVersion: "24H2",
+      build: "26100.4946",
+      lastUpdateId: "KB5063878",
+      lastUpdateDate: "2026-08-28",
+      lastUpdateDetails: "Security Update",
+    },
+    outlook: {
+      displayName: "Outlook 24",
+      release: "2408",
+      build: "17932.20910",
+      fullVersion: "16.0.17932.20910",
+    },
+  });
+});
+
+test("ignores invalid inventory and retains the last valid report", async (t) => {
+  const baseUrl = await withServer(t);
+  await postStatus(baseUrl, {
+    vm: "VM-INVENTORY",
+    inventory: { ramGb: 8, outlook: { displayName: "Outlook 24" } },
+  });
+  await postStatus(baseUrl, {
+    vm: "VM-INVENTORY",
+    inventory: { ramGb: -1, outlook: [] },
+  });
+
+  const body = await fetch(`${baseUrl}/api/status`).then((response) =>
+    response.json(),
+  );
+  assert.deepEqual(body["VM-INVENTORY"].inventory, {
+    ramGb: 8,
+    outlook: { displayName: "Outlook 24" },
+  });
 });

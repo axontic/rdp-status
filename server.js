@@ -98,6 +98,53 @@ function statusFromClientOccupancy(occ) {
   return null;
 }
 
+function normalizeInventory(inventory) {
+  if (!inventory || typeof inventory !== "object" || Array.isArray(inventory))
+    return null;
+
+  const result = {};
+  const ramGb = Number(inventory.ramGb);
+  if (Number.isFinite(ramGb) && ramGb > 0 && ramGb <= 1_048_576)
+    result.ramGb = ramGb;
+
+  if (
+    inventory.os &&
+    typeof inventory.os === "object" &&
+    !Array.isArray(inventory.os)
+  ) {
+    const os = {};
+    for (const field of [
+      "productName",
+      "displayVersion",
+      "build",
+      "lastUpdateId",
+      "lastUpdateDate",
+      "lastUpdateDetails",
+    ]) {
+      const value = inventory.os[field];
+      if (typeof value === "string" && value.trim())
+        os[field] = value.trim().slice(0, 200);
+    }
+    if (Object.keys(os).length) result.os = os;
+  }
+
+  if (
+    inventory.outlook &&
+    typeof inventory.outlook === "object" &&
+    !Array.isArray(inventory.outlook)
+  ) {
+    const outlook = {};
+    for (const field of ["displayName", "release", "build", "fullVersion"]) {
+      const value = inventory.outlook[field];
+      if (typeof value === "string" && value.trim())
+        outlook[field] = value.trim().slice(0, 100);
+    }
+    if (Object.keys(outlook).length) result.outlook = outlook;
+  }
+
+  return Object.keys(result).length ? result : null;
+}
+
 // Manual IP → hostname overrides (takes priority over DNS reverse lookup)
 const IP_HOSTNAME_MAP = {
   "192.168.29.151": "melone.we4it.com",
@@ -145,7 +192,10 @@ function chooseEmoji(host) {
   return "💻";
 }
 
-function createApp({ machineInfo: descriptions = machineInfo, offlineMs = OFFLINE_MS } = {}) {
+function createApp({
+  machineInfo: descriptions = machineInfo,
+  offlineMs = OFFLINE_MS,
+} = {}) {
   const app = express();
   const state = Object.create(null);
   app.use(cors());
@@ -153,94 +203,102 @@ function createApp({ machineInfo: descriptions = machineInfo, offlineMs = OFFLIN
   app.use(express.static(path.join(__dirname, "public")));
 
   app.post("/api/status", async (req, res) => {
-  const {
-    vm,
-    ip,
-    rdns,
-    fqdn,
-    sessions,
-    occupancy,
-    event,
-    user,
-    sessionId,
-    ts,
-  } = req.body || {};
-  if (!vm) return res.status(400).json({ error: "Missing field: vm" });
+    const {
+      vm,
+      ip,
+      rdns,
+      fqdn,
+      sessions,
+      occupancy,
+      event,
+      user,
+      sessionId,
+      ts,
+      inventory,
+    } = req.body || {};
+    if (!vm) return res.status(400).json({ error: "Missing field: vm" });
 
-  const {
-    normSessions,
-    counts,
-    status: statusFromSess,
-  } = deriveCountsAndStatus(sessions);
-  const occStatus = statusFromClientOccupancy(occupancy);
-  const status =
-    statusFromSess === "BUSY" ? "BUSY" : (occStatus ?? statusFromSess);
+    const {
+      normSessions,
+      counts,
+      status: statusFromSess,
+    } = deriveCountsAndStatus(sessions);
+    const occStatus = statusFromClientOccupancy(occupancy);
+    const status =
+      statusFromSess === "BUSY" ? "BUSY" : (occStatus ?? statusFromSess);
 
-  let resolvedRdns = rdns || null;
-  let hostname = fqdn || resolvedRdns || vm;
+    let resolvedRdns = rdns || null;
+    let hostname = fqdn || resolvedRdns || vm;
 
-  const mappedHostname = resolveHostnameFromMap(ip);
-  if (mappedHostname) {
-    resolvedRdns = resolvedRdns || mappedHostname;
-    hostname = mappedHostname;
-  } else if (!resolvedRdns && ip) {
-    try {
-      const names = await dns.reverse(ip);
-      if (names?.length) {
-        resolvedRdns = names[0];
-        hostname = resolvedRdns;
+    const mappedHostname = resolveHostnameFromMap(ip);
+    if (mappedHostname) {
+      resolvedRdns = resolvedRdns || mappedHostname;
+      hostname = mappedHostname;
+    } else if (!resolvedRdns && ip) {
+      try {
+        const names = await dns.reverse(ip);
+        if (names?.length) {
+          resolvedRdns = names[0];
+          hostname = resolvedRdns;
+        }
+      } catch {
+        /* ignore DNS errors */
       }
-    } catch {
-      /* ignore DNS errors */
     }
-  }
 
-  const emoji = chooseEmoji(hostname);
+    const emoji = chooseEmoji(hostname);
+    const normalizedInventory = normalizeInventory(inventory);
+    const previousInventory = state[vm]?.inventory;
 
-  state[vm] = {
-    vm,
-    ip: ip || null,
-    rdns: resolvedRdns,
-    fqdn: fqdn || null,
-    hostname,
-    emoji,
-    sessions: normSessions,
-    occupancy: occupancy || null,
-    status,
-    lastSeen: Date.now(),
-    lastEvent: {
-      event: event || "-",
-      user: user || "",
-      sessionId: Number.isInteger(sessionId) ? sessionId : null,
-      ts: ts || Date.now(),
-    },
-    ...counts,
-  };
+    state[vm] = {
+      vm,
+      ip: ip || null,
+      rdns: resolvedRdns,
+      fqdn: fqdn || null,
+      hostname,
+      emoji,
+      sessions: normSessions,
+      occupancy: occupancy || null,
+      status,
+      ...((normalizedInventory || previousInventory) && {
+        inventory: normalizedInventory || previousInventory,
+      }),
+      lastSeen: Date.now(),
+      lastEvent: {
+        event: event || "-",
+        user: user || "",
+        sessionId: Number.isInteger(sessionId) ? sessionId : null,
+        ts: ts || Date.now(),
+      },
+      ...counts,
+    };
 
-  const t = new Date().toLocaleTimeString();
-  const sessLog = normSessions
-    .map((s) => `${s.type}#${s.sessionId ?? "-"} ${s.user || "-"} [${s.state}]`)
-    .join(" | ");
-  console.log(
-    `[${t}] ${vm} (${hostname}${ip ? " - " + ip : ""}) -> ${state[vm].lastEvent.event} | status=${status} | rdpAct=${counts.rdp_active_count} rdpDisc=${counts.rdp_disconnected_count} consAct=${counts.console_active_count}`,
-  );
-  if (normSessions.length) console.log(`   sessions: ${sessLog}`);
+    const t = new Date().toLocaleTimeString();
+    const sessLog = normSessions
+      .map(
+        (s) => `${s.type}#${s.sessionId ?? "-"} ${s.user || "-"} [${s.state}]`,
+      )
+      .join(" | ");
+    console.log(
+      `[${t}] ${vm} (${hostname}${ip ? " - " + ip : ""}) -> ${state[vm].lastEvent.event} | status=${status} | rdpAct=${counts.rdp_active_count} rdpDisc=${counts.rdp_disconnected_count} consAct=${counts.console_active_count}`,
+    );
+    if (normSessions.length) console.log(`   sessions: ${sessLog}`);
 
-  res.sendStatus(200);
+    res.sendStatus(200);
   });
 
   app.get("/api/status", (_req, res) => {
-  const now = Date.now();
-  const result = {};
-  for (const [vm, info] of Object.entries(state)) {
-    const offline = now - info.lastSeen > offlineMs;
-    result[vm] = {
-      ...info,
-      effectiveStatus: offline ? "OFFLINE" : info.status,
-      ...(descriptions[vm] ? { description: descriptions[vm] } : {}),
-    };
-  }
-  res.json(result);
+    const now = Date.now();
+    const result = {};
+    for (const [vm, info] of Object.entries(state)) {
+      const offline = now - info.lastSeen > offlineMs;
+      result[vm] = {
+        ...info,
+        effectiveStatus: offline ? "OFFLINE" : info.status,
+        ...(descriptions[vm] ? { description: descriptions[vm] } : {}),
+      };
+    }
+    res.json(result);
   });
 
   app.get("/", (_req, res) => {
@@ -262,4 +320,9 @@ function startServer() {
 
 if (require.main === module) startServer();
 
-module.exports = { createApp, loadMachineInfo, startServer };
+module.exports = {
+  createApp,
+  loadMachineInfo,
+  normalizeInventory,
+  startServer,
+};

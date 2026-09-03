@@ -150,6 +150,15 @@ Report VM status from a client.
   },
   "event": "rdp_connect",
   "user": "DOMAIN\\username",
+  "inventory": {
+    "ramGb": 16,
+    "outlook": {
+      "displayName": "Outlook 24",
+      "release": "2408",
+      "build": "17932.20910",
+      "fullVersion": "16.0.17932.20910"
+    }
+  },
   "ts": "2025-02-19T10:30:00.000Z"
 }
 ```
@@ -168,6 +177,14 @@ Retrieve status of all VMs.
     "status": "BUSY",
     "effectiveStatus": "BUSY",
     "description": "Hardware: 16 GB RAM\nSoftware: CAD 2026",
+    "inventory": {
+      "ramGb": 16,
+      "outlook": {
+        "displayName": "Outlook 24",
+        "release": "2408",
+        "build": "17932.20910"
+      }
+    },
     "rdp_active_count": 1,
     "rdp_disconnected_count": 0,
     "console_active_count": 0,
@@ -215,6 +232,33 @@ Register-ScheduledTask -TaskName "RDP-Status-Client" `
 - Sends `heartbeat` every 60 seconds
 - Sends events on session changes (connect, disconnect, logon, logoff, lock, unlock)
 - Falls back to polling if WMI events unavailable
+- Collects RAM, Windows, and Outlook version information once at startup and includes it in status reports
+- Set `RDP_STATUS_OUTLOOK_RELEASE` (for example, `2408`) when the Office release label cannot be inferred from its build
+
+### One-Shot Client Test
+
+Verify inventory collection locally without contacting the server:
+
+```powershell
+$env:RDP_STATUS_OUTLOOK_RELEASE = "2408"
+powershell.exe -ExecutionPolicy Bypass -File .\win-client\client.ps1 -InventoryOnly
+```
+
+Run an elevated Windows PowerShell session and send one status report without starting the monitoring loop:
+
+```powershell
+$env:RDP_STATUS_SERVER_URL = "http://SERVER:3000/api/status"
+$env:RDP_STATUS_OUTLOOK_RELEASE = "2408"
+powershell.exe -ExecutionPolicy Bypass -File .\win-client\client.ps1 -Once
+```
+
+Inspect the inventory returned by the server:
+
+```powershell
+$status = Invoke-RestMethod "http://SERVER:3000/api/status"
+$vmStatus = $status.PSObject.Properties[$env:COMPUTERNAME].Value
+$vmStatus.inventory | ConvertTo-Json -Depth 5
+```
 
 ## Kubernetes Deployment
 
