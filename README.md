@@ -152,13 +152,11 @@ Report VM status from a client.
   "user": "DOMAIN\\username",
   "inventory": {
     "ramGb": 16,
-    "gpus": ["NVIDIA RTX 4060"],
     "outlook": {
       "displayName": "Outlook 24",
       "release": "2408",
       "build": "17932.20910",
-      "fullVersion": "16.0.17932.20910",
-      "installationType": "Click-to-Run"
+      "fullVersion": "16.0.17932.20910"
     }
   },
   "ts": "2025-02-19T10:30:00.000Z"
@@ -181,7 +179,6 @@ Retrieve status of all VMs.
     "description": "Hardware: 16 GB RAM\nSoftware: CAD 2026",
     "inventory": {
       "ramGb": 16,
-      "gpus": ["NVIDIA RTX 4060"],
       "outlook": {
         "displayName": "Outlook 24",
         "release": "2408",
@@ -235,7 +232,7 @@ Register-ScheduledTask -TaskName "RDP-Status-Client" `
 - Sends `heartbeat` every 60 seconds
 - Sends events on session changes (connect, disconnect, logon, logoff, lock, unlock)
 - Falls back to polling if WMI events unavailable
-- Collects RAM, GPU, and Outlook version information once at startup and includes it in status reports
+- Collects RAM, Windows, and Outlook version information once at startup and includes it in status reports
 - Set `RDP_STATUS_OUTLOOK_RELEASE` (for example, `2408`) when the Office release label cannot be inferred from its build
 
 ### One-Shot Client Test

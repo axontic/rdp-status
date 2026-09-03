@@ -107,12 +107,25 @@ function normalizeInventory(inventory) {
   if (Number.isFinite(ramGb) && ramGb > 0 && ramGb <= 1_048_576)
     result.ramGb = ramGb;
 
-  if (Array.isArray(inventory.gpus)) {
-    const gpus = inventory.gpus
-      .filter((gpu) => typeof gpu === "string" && gpu.trim())
-      .slice(0, 16)
-      .map((gpu) => gpu.trim().slice(0, 200));
-    if (gpus.length) result.gpus = gpus;
+  if (
+    inventory.os &&
+    typeof inventory.os === "object" &&
+    !Array.isArray(inventory.os)
+  ) {
+    const os = {};
+    for (const field of [
+      "productName",
+      "displayVersion",
+      "build",
+      "lastUpdateId",
+      "lastUpdateDate",
+      "lastUpdateDetails",
+    ]) {
+      const value = inventory.os[field];
+      if (typeof value === "string" && value.trim())
+        os[field] = value.trim().slice(0, 200);
+    }
+    if (Object.keys(os).length) result.os = os;
   }
 
   if (
@@ -121,13 +134,7 @@ function normalizeInventory(inventory) {
     !Array.isArray(inventory.outlook)
   ) {
     const outlook = {};
-    for (const field of [
-      "displayName",
-      "release",
-      "build",
-      "fullVersion",
-      "installationType",
-    ]) {
+    for (const field of ["displayName", "release", "build", "fullVersion"]) {
       const value = inventory.outlook[field];
       if (typeof value === "string" && value.trim())
         outlook[field] = value.trim().slice(0, 100);

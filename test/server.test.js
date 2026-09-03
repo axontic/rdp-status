@@ -127,13 +127,20 @@ test("validates and exposes inventory reported by a client", async (t) => {
     vm: "VM-INVENTORY",
     inventory: {
       ramGb: 16,
-      gpus: [" NVIDIA RTX 4060 ", "", 42],
+      os: {
+        productName: "Microsoft Windows 11 Enterprise",
+        displayVersion: "24H2",
+        build: "26100.4946",
+        lastUpdateId: "KB5063878",
+        lastUpdateDate: "2026-08-28",
+        lastUpdateDetails: "Security Update",
+        untrustedField: "ignored",
+      },
       outlook: {
         displayName: "Outlook 24",
         release: "2408",
         build: "17932.20910",
         fullVersion: "16.0.17932.20910",
-        installationType: "Click-to-Run",
         untrustedField: "ignored",
       },
       untrustedField: "ignored",
@@ -145,13 +152,19 @@ test("validates and exposes inventory reported by a client", async (t) => {
   );
   assert.deepEqual(body["VM-INVENTORY"].inventory, {
     ramGb: 16,
-    gpus: ["NVIDIA RTX 4060"],
+    os: {
+      productName: "Microsoft Windows 11 Enterprise",
+      displayVersion: "24H2",
+      build: "26100.4946",
+      lastUpdateId: "KB5063878",
+      lastUpdateDate: "2026-08-28",
+      lastUpdateDetails: "Security Update",
+    },
     outlook: {
       displayName: "Outlook 24",
       release: "2408",
       build: "17932.20910",
       fullVersion: "16.0.17932.20910",
-      installationType: "Click-to-Run",
     },
   });
 });
@@ -164,7 +177,7 @@ test("ignores invalid inventory and retains the last valid report", async (t) =>
   });
   await postStatus(baseUrl, {
     vm: "VM-INVENTORY",
-    inventory: { ramGb: -1, gpus: "not-an-array", outlook: [] },
+    inventory: { ramGb: -1, outlook: [] },
   });
 
   const body = await fetch(`${baseUrl}/api/status`).then((response) =>

@@ -43,7 +43,7 @@ $script:lastSendSucceeded = $false
 
 function Get-MachineInventory {
     $ramGb = $null
-    $gpus = @()
+    $os = $null
     try {
         $computer = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
         if ($computer.TotalPhysicalMemory) {
@@ -52,11 +52,32 @@ function Get-MachineInventory {
     } catch { }
 
     try {
-        $gpus = @(
-            Get-CimInstance -ClassName Win32_VideoController -ErrorAction Stop |
-                Where-Object { $_.Name } |
-                Select-Object -ExpandProperty Name -Unique
-        )
+        $windows = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
+        $operatingSystem = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
+        $build = [string]$windows.CurrentBuildNumber
+        if ($null -ne $windows.UBR) { $build = "$build.$($windows.UBR)" }
+
+        $lastUpdate = Get-HotFix -ErrorAction SilentlyContinue |
+            Where-Object { $_.InstalledOn } |
+            Sort-Object InstalledOn -Descending |
+            Select-Object -First 1
+        $lastUpdateDate = $null
+        if ($lastUpdate -and $lastUpdate.InstalledOn) {
+            try {
+                $lastUpdateDate = ([datetime]$lastUpdate.InstalledOn).ToString('yyyy-MM-dd')
+            } catch {
+                $lastUpdateDate = [string]$lastUpdate.InstalledOn
+            }
+        }
+
+        $os = [ordered]@{
+            productName       = if ($operatingSystem.Caption) { $operatingSystem.Caption } else { $windows.ProductName }
+            displayVersion    = $windows.DisplayVersion
+            build             = $build
+            lastUpdateId      = if ($lastUpdate) { $lastUpdate.HotFixID } else { $null }
+            lastUpdateDate    = $lastUpdateDate
+            lastUpdateDetails = if ($lastUpdate) { $lastUpdate.Description } else { $null }
+        }
     } catch { }
 
     $outlook = $null
@@ -101,14 +122,13 @@ function Get-MachineInventory {
                 release          = $release
                 build            = $build
                 fullVersion      = $fullVersion
-                installationType = 'Click-to-Run'
             }
         } catch { }
     }
 
     return [ordered]@{
         ramGb   = $ramGb
-        gpus    = @($gpus)
+        os      = $os
         outlook = $outlook
     }
 }
