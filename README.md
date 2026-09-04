@@ -260,6 +260,21 @@ $vmStatus = $status.PSObject.Properties[$env:COMPUTERNAME].Value
 $vmStatus.inventory | ConvertTo-Json -Depth 5
 ```
 
+### Client Hang Diagnostics
+
+Use timestamped debug checkpoints to identify the operation after which the client stops progressing:
+
+```powershell
+# Test inventory collection only
+powershell.exe -ExecutionPolicy Bypass -File .\win-client\client.ps1 -InventoryOnly -DebugMode
+
+# Test collection plus one HTTP report and save all output
+powershell.exe -ExecutionPolicy Bypass -File .\win-client\client.ps1 -Once -DebugMode *>&1 |
+  Tee-Object .\client-debug.log
+```
+
+Running without `-Once` or `-InventoryOnly` intentionally enters a permanent event-monitoring loop. In debug mode, `Session event subscription registered; entering event loop` confirms that normal monitoring has started rather than hung.
+
 ## Kubernetes Deployment
 
 ```bash
