@@ -764,10 +764,17 @@
           .replace(/'/g, "&#39;");
       }
 
+      function loggedInSessions(info) {
+        return (Array.isArray(info.sessions) ? info.sessions : []).filter(
+          (s) => s && s.user && (s.state === "active" || s.state === "connected"),
+        );
+      }
+
       function hasMachineDetails(info) {
         const inventory = info.inventory;
         return Boolean(
           info.description ||
+          loggedInSessions(info).length ||
           (inventory && (inventory.ramGb || inventory.os || inventory.outlook)),
         );
       }
@@ -781,12 +788,20 @@
         }
 
         const inventory = info.inventory;
-        if (inventory) {
+        const users = loggedInSessions(info);
+        if (users.length || inventory) {
           const rows = [];
-          if (inventory.ramGb) {
+          if (users.length) {
+            rows.push(
+              `<dt>Logged-in user</dt><dd>${users
+                .map((s) => `${escapeHtml(s.user)} (${escapeHtml(s.type)}, ${escapeHtml(s.state)})`)
+                .join("<br>")}</dd>`,
+            );
+          }
+          if (inventory && inventory.ramGb) {
             rows.push(`<dt>RAM</dt><dd>${escapeHtml(inventory.ramGb)} GB</dd>`);
           }
-          if (inventory.os) {
+          if (inventory && inventory.os) {
             const os = inventory.os;
             const windowsParts = [];
             if (os.productName) windowsParts.push(os.productName);
@@ -808,7 +823,7 @@
               );
             }
           }
-          if (inventory.outlook) {
+          if (inventory && inventory.outlook) {
             const outlook = inventory.outlook;
             const parts = [];
             if (outlook.displayName) parts.push(outlook.displayName);

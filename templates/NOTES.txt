@@ -1,4 +1,16 @@
 RDP Status Dashboard wurde erfolgreich installiert!
+{{- $ingress := .Values.ingress | default dict }}
+{{- if ($ingress.enabled | default false) }}
+
+1. Dashboard öffnen (nur über den internen Traefik erreichbar):
+   https://{{ $ingress.host }}
+
+2. PowerShell-Client auf Windows-VMs konfigurieren:
+   $serverUrl = "https://{{ $ingress.host }}/api/status"
+
+3. Client starten (als Administrator):
+   .\client.ps1
+{{- else }}
 
 1. Service-IP abfragen:
    kubectl get svc {{ include "rdp-status.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
@@ -11,3 +23,4 @@ RDP Status Dashboard wurde erfolgreich installiert!
 
 4. Client starten (als Administrator):
    .\client.ps1
+{{- end }}
