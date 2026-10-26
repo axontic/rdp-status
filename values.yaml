@@ -2,15 +2,26 @@ replicaCount: 1
 
 image:
   repository: axontic.azurecr.io/rdp-status-dashboard
-  tag: 1.1.1
+  tag: 1.1.4
   pullPolicy: IfNotPresent
 
 service:
-  type: LoadBalancer
-  port: 443
-  targetPort: https
-  annotations:
-    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+
+# Exposed only through the cluster's internal Traefik (no own LoadBalancer).
+# TLS is terminated by Traefik; set className to your internal Traefik IngressClass.
+ingress:
+  enabled: true
+  className: traefik-private
+  host: rdp-status.axontic.com
+  annotations: {}
+  tls:
+    enabled: true
+    # secretName: leave empty to use Traefik's default certificate (like langfuse)
+    secretName: ""
 
 env:
   PORT: 3000
@@ -20,12 +31,12 @@ env:
   USE_CLIENT_OCCUPANCY: "true"
 
 tlsProxy:
-  enabled: true
+  enabled: false
   httpPort: 8080
   secretName: rdp-status-tls
   port: 8443
   hosts:
-    - rdp-status.we4it.com
+    - rdp-status.axontic.com
   image:
     repository: nginx
     tag: 1.27-alpine
